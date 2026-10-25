@@ -19,7 +19,9 @@
 
 ## 下载
 
-在 [Releases](../../releases) 或 [Actions](../../actions) 的构建产物中下载 Windows 安装包（`.exe` / `.msi`）。
+在 [Releases](../../releases) 下载 `netron-plus.exe`，或在 [Actions](../../actions) 下载 `netron-plus-windows` 构建产物并解压，双击 `netron-plus.exe` 即可运行，无需安装本程序。
+
+程序依赖系统的 Microsoft Edge WebView2 Runtime；缺少该运行时的电脑需要先安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
 
 ## 项目结构
 
@@ -33,21 +35,21 @@ scripts       生成测试模型的脚本（CI 中运行）
 
 所有计算都在 Rust 中完成；桌面版通过 Tauri IPC 调用，网页版在 Web Worker 中运行同一份 Rust 代码编译出的 WebAssembly。
 
-## 构建
+## 云端构建
 
-本仓库通过 GitHub Actions 构建（`.github/workflows/ci.yml`）：
+本仓库统一通过 GitHub Actions 安装依赖、测试和编译，本地只保留源码，不安装构建依赖。
+
+推送到 `main`、创建或更新 Pull Request 时会自动运行 CI（`.github/workflows/ci.yml`）：
 
 - `core`：运行 Rust 单元测试，并用 ONNX 官方形状推断结果校验本项目的形状推断
 - `web`：构建 WebAssembly 核心与前端
-- `desktop`：在 Windows 上构建 Tauri 安装包
+- `desktop`：在 Windows 上构建单个免安装程序 `netron-plus.exe`
 
-本地构建需要 Rust 和 Node.js 22：
+需要手动构建时，在 [Actions](../../actions) 中选择 `CI` 或 `Release`，点击 `Run workflow`。完成后进入该次运行，在 Artifacts 中下载 `netron-plus-windows`，解压后得到单个 `netron-plus.exe`。
 
-```bash
-npm install
-npx tauri icon app-icon.png
-npx tauri build
-```
+推送 `v*` 标签时会运行 `.github/workflows/release.yml`，并将 `netron-plus.exe` 上传到对应的 [Release](../../releases)。手动运行 `Release` 工作流时，可从该次运行的 Artifacts 下载程序。
+
+Windows 程序在云端的生成路径为 `target/release/netron-plus.exe`。前端资源已嵌入程序，无需附带 `dist` 目录。
 
 ## English
 
