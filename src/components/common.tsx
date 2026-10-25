@@ -228,6 +228,22 @@ export function MenuList({ items, onClose }: { items: MenuItem[]; onClose: () =>
   );
 }
 
+/** While `active`, Escape calls `onEscape` and goes no further (so it does not also clear the selection). */
+export function useEscape(active: boolean, onEscape: () => void) {
+  const cb = useRef(onEscape);
+  cb.current = onEscape;
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      cb.current();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [active]);
+}
+
 /** Button that opens a menu below it; closes on outside click or Escape. */
 export function Dropdown({
   icon,
@@ -251,16 +267,10 @@ export function Dropdown({
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
+  useEscape(open, () => setOpen(false));
   const list = typeof items === 'function' ? (open ? items() : []) : items;
   return (
     <div className="dropdown" ref={ref}>

@@ -18,7 +18,7 @@ import {
   type FocusRequest,
 } from '../store';
 import type { GraphView, ModuleNode, ViewNode } from '../types';
-import { Dropdown, Icon, IconButton, MenuList, Spinner, type MenuItem } from '../components/common';
+import { Dropdown, Icon, IconButton, MenuList, Spinner, useEscape, type MenuItem } from '../components/common';
 import { readTheme } from './colors';
 import { Minimap } from './minimap';
 import { GraphRenderer } from './renderer';
@@ -72,6 +72,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
   const [narrow, setNarrow] = useState(false);
   const [tip, setTip] = useState<Tip | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  useEscape(!!menu, () => setMenu(null));
 
   const nodeIndex = useMemo(() => {
     const m = new Map<number, number>();
