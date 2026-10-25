@@ -149,7 +149,7 @@ export interface ViewLine {
   value: number;
 }
 
-export type ViewNodeKind = 'op' | 'input' | 'output' | 'outer' | 'missing';
+export type ViewNodeKind = 'op' | 'module' | 'input' | 'output' | 'outer' | 'missing';
 
 export interface ViewNode {
   kind: ViewNodeKind;
@@ -161,6 +161,10 @@ export interface ViewNode {
   lines: ViewLine[];
   module: string;
   sub: boolean;
+  /** Nodes inside a collapsed module node. */
+  members?: number;
+  /** IR node ids represented by a collapsed module node. */
+  ids?: number[];
   x: number;
   y: number;
   w: number;
@@ -187,6 +191,7 @@ export interface GraphView {
   height: number;
   hiddenConstants: number;
   foldedNodes: number;
+  collapsedNodes: number;
 }
 
 export interface NodeRef {

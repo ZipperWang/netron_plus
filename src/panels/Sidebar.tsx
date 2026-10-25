@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   callModel,
+  collapseModule,
+  expandModule,
   highlightNodes,
+  inModule,
   setGraph,
+  showModule,
   showNode,
   showValue,
   useStore,
   useT,
 } from '../store';
 import type { ModuleNode, OpRow, SearchHit } from '../types';
-import { Dot, Icon, Section, SearchInput } from '../components/common';
+import { Dot, Icon, IconButton, Section, SearchInput } from '../components/common';
 import { CATEGORY_ORDER, categoryColor } from '../graph/colors';
 import { fmtCount, shapeLabel } from '../util/format';
 import type { MsgKey } from '../i18n';
@@ -237,16 +241,23 @@ export function Sidebar() {
 }
 
 function ModuleRow({ node, depth, defaultOpen }: { node: ModuleNode; depth: number; defaultOpen?: boolean }) {
+  const t = useT();
   const [open, setOpen] = useState(!!defaultOpen);
   const graphId = useStore((s) => s.graphId);
+  const collapsed = useStore((s) => s.collapsed);
   const hasChildren = node.children.length > 0;
+  const isCollapsed = collapsed.includes(node.path);
+  const hidden = !isCollapsed && collapsed.some((p) => inModule(node.path, p));
   const select = () => {
     const v = useStore.getState().view;
     if (!v) return;
-    const prefix = `${node.path}/`;
-    const ids = v.nodes
-      .filter((n) => n.kind === 'op' && (n.module === node.path || n.module.startsWith(prefix)))
-      .map((n) => n.node);
+    // Inside a collapsed module: go to the module box.
+    const box = v.nodes.find((n) => n.kind === 'module' && inModule(node.path, n.module));
+    if (box) {
+      showModule(graphId, box.module);
+      return;
+    }
+    const ids = v.nodes.filter((n) => n.kind === 'op' && inModule(n.module, node.path)).map((n) => n.node);
     highlightNodes(node.path, graphId, ids, true);
   };
   return (
@@ -255,10 +266,25 @@ function ModuleRow({ node, depth, defaultOpen }: { node: ModuleNode; depth: numb
         <button type="button" className="tree-toggle" onClick={() => setOpen(!open)} disabled={!hasChildren}>
           {hasChildren ? <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} /> : <span className="tree-leaf" />}
         </button>
-        <button type="button" className="tree-label" onClick={select} title={`${node.path}\n${node.nodes} nodes · ${fmtCount(node.params)} params · ${fmtCount(node.flops)} FLOPs`}>
+        <button
+          type="button"
+          className={'tree-label' + (hidden ? ' dim' : '')}
+          onClick={select}
+          title={`${node.path}\n${node.nodes} nodes · ${fmtCount(node.params)} params · ${fmtCount(node.flops)} FLOPs`}
+        >
           <span className="ellipsis">{node.name}</span>
           <span className="count">{node.nodes}</span>
         </button>
+        {node.nodes >= 2 && (
+          <IconButton
+            icon="layers"
+            size={12}
+            className="tree-action"
+            active={isCollapsed}
+            title={isCollapsed ? t('side.expand') : t('side.collapse')}
+            onClick={() => (isCollapsed ? expandModule(node.path) : collapseModule(node.path))}
+          />
+        )}
       </div>
       {open && node.children.map((c) => <ModuleRow key={c.path} node={c} depth={depth + 1} />)}
     </>

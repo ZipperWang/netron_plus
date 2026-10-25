@@ -76,6 +76,8 @@ pub struct ViewOptions {
     /// Hide nodes that only compute known shape values (Shape → Gather →
     /// Concat ...) and show the computed values inside their consumers.
     pub fold_shapes: bool,
+    /// Module paths (see `model::module_path`) shown as single nodes.
+    pub collapsed: Vec<String>,
     pub max_attributes: usize,
     pub metrics: FontMetrics,
 }
@@ -90,6 +92,7 @@ impl Default for ViewOptions {
             edge_labels: true,
             detach_long_edges: true,
             fold_shapes: true,
+            collapsed: Vec::new(),
             max_attributes: 8,
             metrics: FontMetrics::default(),
         }
@@ -108,7 +111,7 @@ pub struct ViewLine {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewNode {
-    /// "op" | "input" | "output" | "outer" | "missing"
+    /// "op" | "module" | "input" | "output" | "outer" | "missing"
     pub kind: &'static str,
     pub node: i64,
     pub value: i64,
@@ -118,6 +121,12 @@ pub struct ViewNode {
     pub lines: Vec<ViewLine>,
     pub module: String,
     pub sub: bool,
+    /// Number of nodes inside a collapsed module node.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub members: usize,
+    /// IR node ids represented by a collapsed module node.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ids: Vec<usize>,
     pub x: f64,
     pub y: f64,
     pub w: f64,
@@ -150,6 +159,18 @@ pub struct GraphView {
     pub height: f64,
     pub hidden_constants: usize,
     pub folded_nodes: usize,
+    pub collapsed_nodes: usize,
+}
+
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
+/// Is `module` equal to `path` or nested inside it?
+fn in_module(module: &str, path: &str) -> bool {
+    module.len() >= path.len()
+        && module.starts_with(path)
+        && (module.len() == path.len() || module.as_bytes()[path.len()] == b'/')
 }
 
 fn weight_line(g: &Graph, vid: usize, label: String) -> ViewLine {
@@ -199,6 +220,29 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
     let mut value_view: HashMap<usize, usize> = HashMap::new();
     let mut hidden_constants = 0usize;
     let mut folded_nodes = 0usize;
+    let mut collapsed_nodes = 0usize;
+
+    // Collapsed modules: every node maps to the outermost collapsed module
+    // that contains it.
+    let modules: Vec<String> = g.nodes.iter().map(|n| module_path(&n.name)).collect();
+    let collapsed: Vec<&str> = opt
+        .collapsed
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut group_of: Vec<Option<usize>> = vec![None; g.nodes.len()];
+    if !collapsed.is_empty() {
+        for (ni, m) in modules.iter().enumerate() {
+            group_of[ni] = collapsed
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| in_module(m, c))
+                .min_by_key(|(_, c)| c.len())
+                .map(|(i, _)| i);
+        }
+    }
+    let mut group_view: Vec<Option<usize>> = vec![None; collapsed.len()];
 
     // Values whose contents shape inference fully determined (shape
     // arithmetic); nodes producing only such values can be folded away.
@@ -269,6 +313,8 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            members: 0,
+            ids: Vec::new(),
             x: 0.0,
             y: 0.0,
             w,
@@ -289,6 +335,71 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
         }
         if folded[ni] {
             folded_nodes += 1;
+            continue;
+        }
+        if let Some(gi) = group_of[ni] {
+            collapsed_nodes += 1;
+            if let Some(vn) = group_view[gi] {
+                node_view[ni] = Some(vn);
+                continue;
+            }
+            let path = collapsed[gi];
+            let mut counts: Vec<(String, usize)> = Vec::new();
+            let mut members = 0usize;
+            for (nj, n) in g.nodes.iter().enumerate() {
+                if group_of[nj] != Some(gi) || folded[nj] {
+                    continue;
+                }
+                if n.op_type == "Constant" && n.is_standard() && !opt.show_constants {
+                    continue;
+                }
+                members += 1;
+                match counts.iter_mut().find(|c| c.0 == n.op_type) {
+                    Some(c) => c.1 += 1,
+                    None => counts.push((n.op_type.clone(), 1)),
+                }
+            }
+            counts.sort_by(|a, b| b.1.cmp(&a.1));
+            let mut lines: Vec<ViewLine> = counts
+                .iter()
+                .take(4)
+                .map(|(op, c)| ViewLine {
+                    k: op.clone(),
+                    v: format!("×{}", c),
+                    value: -1,
+                })
+                .collect();
+            if counts.len() > 4 {
+                let rest: usize = counts[4..].iter().map(|c| c.1).sum();
+                lines.push(ViewLine {
+                    k: "…".into(),
+                    v: format!("×{}", rest),
+                    value: -1,
+                });
+            }
+            let title = path.rsplit('/').next().unwrap_or(path).to_string();
+            let name = if opt.show_names || title != path { path.to_string() } else { String::new() };
+            let (w, h) = measure(&title, &name, &lines);
+            let vn = vnodes.len();
+            group_view[gi] = Some(vn);
+            node_view[ni] = Some(vn);
+            vnodes.push(ViewNode {
+                kind: "module",
+                node: -1,
+                value: -1,
+                title,
+                name,
+                cat: "module",
+                lines,
+                module: path.to_string(),
+                sub: false,
+                members,
+                ids: (0..g.nodes.len()).filter(|&nj| group_of[nj] == Some(gi)).collect(),
+                x: 0.0,
+                y: 0.0,
+                w,
+                h,
+            });
             continue;
         }
         let mut lines = Vec::new();
@@ -341,8 +452,10 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             name,
             cat: ops::category(&node.domain, &node.op_type).as_str(),
             lines,
-            module: module_path(&node.name),
+            module: modules[ni].clone(),
             sub: !node.subgraphs.is_empty(),
+            members: 0,
+            ids: Vec::new(),
             x: 0.0,
             y: 0.0,
             w,
@@ -395,6 +508,8 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            members: 0,
+            ids: Vec::new(),
             x: 0.0,
             y: 0.0,
             w,
@@ -411,7 +526,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
                 continue;
             }
             if let Some(from) = source_of(vid, &mut vnodes, &mut value_view) {
-                if seen.insert((from, to, vid)) {
+                if from != to && seen.insert((from, to, vid)) {
                     pending.push(PendingEdge {
                         from,
                         to,
@@ -459,6 +574,8 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            members: 0,
+            ids: Vec::new(),
             x: 0.0,
             y: 0.0,
             w,
@@ -545,5 +662,6 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
         height: lay.height,
         hidden_constants,
         folded_nodes,
+        collapsed_nodes,
     })
 }

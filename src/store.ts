@@ -18,9 +18,11 @@ export type Tab = 'graph' | 'summary' | 'operators' | 'nodes' | 'tensors' | 'wei
 export const TABS: Tab[] = ['graph', 'summary', 'operators', 'nodes', 'tensors', 'weights', 'checks'];
 
 export interface Selection {
-  kind: 'node' | 'value';
+  kind: 'node' | 'value' | 'module';
   graph: number;
   id: number;
+  /** Module path for module selections. */
+  path?: string;
 }
 
 export interface Highlight {
@@ -55,8 +57,9 @@ export interface Toast {
 export interface FocusRequest {
   seq: number;
   graph: number;
-  kind: 'node' | 'value' | 'nodes' | 'fit';
+  kind: 'node' | 'value' | 'nodes' | 'fit' | 'module';
   ids: number[];
+  path?: string;
 }
 
 interface State {
@@ -87,6 +90,8 @@ interface State {
   issues: { deep: boolean; list: Issue[] } | null;
   hierarchy: { graph: number; root: ModuleNode } | null;
   nodeFilter: string;
+  /** Module paths collapsed into single nodes in the current graph. */
+  collapsed: string[];
   showHelp: boolean;
   dropping: boolean;
 }
@@ -194,6 +199,7 @@ export const useStore = create<State>()(() => ({
   issues: null,
   hierarchy: null,
   nodeFilter: '',
+  collapsed: [],
   showHelp: false,
   dropping: false,
 }));
@@ -318,6 +324,7 @@ function resetForModel(summary: ModelSummary) {
     issues: null,
     hierarchy: null,
     nodeFilter: '',
+    collapsed: [],
     tab: 'graph',
     focus: null,
   });
@@ -388,6 +395,7 @@ export async function closeModel() {
     weightRows: null,
     issues: null,
     hierarchy: null,
+    collapsed: [],
   });
   document.title = 'Netron Plus';
 }
@@ -398,7 +406,7 @@ export function clearRecent() {
 
 let viewReq = 0;
 export async function loadView(graph: number, mode: 'initial' | 'keep' = 'keep') {
-  const { backend, summary, viewOpts } = get();
+  const { backend, summary, viewOpts, collapsed } = get();
   if (!backend || !summary) return;
   const req = ++viewReq;
   set({ viewLoading: true });
@@ -406,7 +414,7 @@ export async function loadView(graph: number, mode: 'initial' | 'keep' = 'keep')
     const view = await backend.call<GraphView>('graph', {
       model: summary.id,
       graph,
-      options: { ...viewOpts, maxAttributes: 8, metrics: fontMetrics() },
+      options: { ...viewOpts, collapsed, maxAttributes: 8, metrics: fontMetrics() },
     });
     if (req !== viewReq || get().summary?.id !== summary.id) return;
     set({ view, graphId: graph, viewMode: mode });
@@ -433,6 +441,7 @@ export function setGraph(graph: number, keepSelection = false) {
     trace: 'none',
     selection: keepSelection ? get().selection : null,
     graphId: graph,
+    collapsed: [],
   });
   void loadView(graph, 'initial');
   void loadHierarchy(graph);
@@ -454,8 +463,54 @@ export function setViewOpts(patch: Partial<ViewOpts>) {
 }
 
 let focusSeq = 0;
-function requestFocus(graph: number, kind: FocusRequest['kind'], ids: number[]) {
-  set({ focus: { seq: ++focusSeq, graph, kind, ids } });
+function requestFocus(graph: number, kind: FocusRequest['kind'], ids: number[], path?: string) {
+  set({ focus: { seq: ++focusSeq, graph, kind, ids, path } });
+}
+
+/** Is `module` equal to `path` or nested inside it? */
+export function inModule(module: string, path: string): boolean {
+  return module === path || module.startsWith(`${path}/`);
+}
+
+export function setCollapsed(paths: string[]) {
+  set({ collapsed: paths, highlight: null, trace: 'none' });
+  void loadView(get().graphId, 'keep');
+}
+
+/** Show a module as a single node (absorbing collapsed modules inside it). */
+export function collapseModule(path: string) {
+  const cur = get().collapsed;
+  if (cur.some((p) => inModule(path, p))) return;
+  setCollapsed([...cur.filter((p) => !inModule(p, path)), path]);
+}
+
+export function expandModule(path: string) {
+  setCollapsed(get().collapsed.filter((p) => p !== path));
+}
+
+/** Collapse every module at the given depth of the module tree (1 = top). */
+export function collapseLevel(depth: number) {
+  const h = get().hierarchy;
+  if (!h) return;
+  const out: string[] = [];
+  const walk = (n: ModuleNode, d: number) => {
+    for (const c of n.children) {
+      if (d === depth) {
+        if (c.nodes >= 2) out.push(c.path);
+      } else walk(c, d + 1);
+    }
+  };
+  walk(h.root, 1);
+  setCollapsed(out);
+}
+
+export function expandAll() {
+  setCollapsed([]);
+}
+
+export function showModule(graph: number, path: string) {
+  set({ selection: { kind: 'module', graph, id: -1, path }, tab: 'graph' });
+  requestFocus(graph, 'module', [], path);
 }
 
 export function select(sel: Selection | null) {

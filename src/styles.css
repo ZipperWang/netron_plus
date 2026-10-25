@@ -1949,3 +1949,30 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 4px;
 }
+
+/* -------------------------------------------------------- module collapse */
+
+.tree-label.dim {
+  opacity: 0.5;
+}
+.tree-action {
+  width: 22px;
+  height: 22px;
+  opacity: 0.45;
+}
+.tree-row:hover .tree-action,
+.tree-action.active {
+  opacity: 1;
+}
+.module-row {
+  gap: 6px;
+  cursor: default;
+}
+.module-row .link {
+  flex: 1;
+  min-width: 0;
+}
+.module-row .icon-btn {
+  width: 22px;
+  height: 22px;
+}

@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   callModel,
+  collapseModule,
   errorText,
+  expandModule,
   exportTensor,
+  highlightNodes,
+  inModule,
   openExternal,
   select,
   setGraph,
+  showModule,
   showNode,
   showValue,
   copyText,
   useStore,
   useT,
 } from '../store';
-import type { NodeDetail, NodeRef, TensorMeta, TensorStats, ValueBrief, ValueDetail, ValuesPage } from '../types';
+import type { ModuleNode, NodeDetail, NodeRef, TensorMeta, TensorStats, ValueBrief, ValueDetail, ValuesPage } from '../types';
 import { Badge, Button, CopyButton, Dot, Empty, Icon, IconButton, KV, Section, Spinner } from '../components/common';
 import { HistogramChart } from '../components/Charts';
 import { categoryColor } from '../graph/colors';
@@ -53,6 +58,9 @@ export function Inspector() {
         {!selection && <Empty icon="info" title={t('insp.empty')} />}
         {selection?.kind === 'node' && <NodeInspector key={`n${selection.graph}:${selection.id}`} graph={selection.graph} id={selection.id} />}
         {selection?.kind === 'value' && <ValueInspector key={`v${selection.graph}:${selection.id}`} graph={selection.graph} id={selection.id} />}
+        {selection?.kind === 'module' && selection.path !== undefined && (
+          <ModuleInspector key={`m${selection.graph}:${selection.path}`} graph={selection.graph} path={selection.path} />
+        )}
       </div>
     </aside>
   );
@@ -530,6 +538,122 @@ function ValuePager({ graph, meta }: { graph: number; meta: TensorMeta }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+export function findModule(root: ModuleNode, path: string): ModuleNode | null {
+  if (root.path === path) return root;
+  for (const c of root.children) {
+    if (inModule(path, c.path)) return findModule(c, path);
+  }
+  return null;
+}
+
+function ModuleInspector({ graph, path }: { graph: number; path: string }) {
+  const t = useT();
+  const hierarchy = useStore((s) => s.hierarchy);
+  const collapsed = useStore((s) => s.collapsed);
+  const view = useStore((s) => s.view);
+  const node = hierarchy && hierarchy.graph === graph ? findModule(hierarchy.root, path) : null;
+  const isCollapsed = collapsed.includes(path);
+  const ops = useMemo(() => {
+    const vnode = view?.nodes.find((n) => n.kind === 'module' && n.module === path);
+    if (vnode) return vnode.lines.map((l) => [l.k, l.v] as [string, string]);
+    const counts = new Map<string, number>();
+    for (const n of view?.nodes ?? []) {
+      if (n.kind === 'op' && inModule(n.module, path)) counts.set(n.title, (counts.get(n.title) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, c]) => [k, `×${c}`] as [string, string]);
+  }, [view, path]);
+
+  const locate = (p: string) => {
+    const v = useStore.getState().view;
+    if (!v) return;
+    const box = v.nodes.find((n) => n.kind === 'module' && inModule(p, n.module));
+    if (box) {
+      showModule(graph, box.module);
+      return;
+    }
+    highlightNodes(
+      p,
+      graph,
+      v.nodes.filter((n) => n.kind === 'op' && inModule(n.module, p)).map((n) => n.node),
+      true,
+    );
+  };
+
+  return (
+    <div className="insp">
+      <div className="insp-head">
+        <div className="insp-op">
+          <Dot color={categoryColor('module')} />
+          <span>{path.split('/').pop()}</span>
+          <Badge>{t('insp.moduleTitle')}</Badge>
+        </div>
+        <div className="insp-actions">
+          <IconButton icon="target" title={t('common.showInGraph')} onClick={() => locate(path)} />
+        </div>
+      </div>
+      <div className="insp-name mono">
+        <span>{path}</span>
+        <CopyButton text={path} title={t('common.copy')} />
+      </div>
+      {node && (
+        <div className="metrics">
+          <Metric label={t('insp.members')} value={fmtInt(node.nodes)} />
+          <Metric label={t('insp.params')} value={fmtCount(node.params)} title={fmtInt(node.params)} />
+          <Metric label={t('insp.flops')} value={fmtCount(node.flops)} title={fmtInt(node.flops)} />
+          <Metric label={t('insp.children')} value={String(node.children.length)} />
+        </div>
+      )}
+      <div className="btn-row">
+        {isCollapsed ? (
+          <Button small icon="layers" onClick={() => expandModule(path)}>
+            {t('insp.expand')}
+          </Button>
+        ) : (
+          <Button small icon="layers" onClick={() => collapseModule(path)}>
+            {t('insp.collapse')}
+          </Button>
+        )}
+        <Button small icon="table" onClick={() => useStore.setState({ nodeFilter: path, tab: 'nodes' })}>
+          {t('graph.showInTable')}
+        </Button>
+      </div>
+      {ops.length > 0 && (
+        <Section title={t('insp.moduleOps')}>
+          {ops.map(([k, v]) => (
+            <KV key={k} k={k} mono>
+              {v}
+            </KV>
+          ))}
+        </Section>
+      )}
+      {node && node.children.length > 0 && (
+        <Section title={t('insp.children')} count={node.children.length}>
+          {node.children.map((c) => {
+            const childCollapsed = collapsed.includes(c.path);
+            return (
+              <div key={c.path} className="list-row module-row">
+                <button type="button" className="link list-main" title={c.path} onClick={() => locate(c.path)}>
+                  <span className="ellipsis">{c.name}</span>
+                </button>
+                <span className="count" title={`${fmtInt(c.params)} params`}>
+                  {c.nodes} · {fmtCount(c.flops)}
+                </span>
+                <IconButton
+                  icon="layers"
+                  size={13}
+                  active={childCollapsed}
+                  title={childCollapsed ? t('side.expand') : t('side.collapse')}
+                  onClick={() => (childCollapsed ? expandModule(c.path) : collapseModule(c.path))}
+                />
+              </div>
+            );
+          })}
+        </Section>
       )}
     </div>
   );

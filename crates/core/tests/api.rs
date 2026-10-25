@@ -204,6 +204,42 @@ fn full_api_roundtrip() {
     assert_eq!(unfolded["foldedNodes"], 0);
     assert!(unfolded["nodes"].as_array().unwrap().iter().any(|n| n["title"] == "Shape"));
 
+    // Collapsing a module turns its nodes into one node; nested paths are
+    // absorbed by the outermost collapsed module.
+    let col = call(
+        &ws,
+        "graph",
+        json!({"model": id, "graph": 0, "options": {"collapsed": ["features", "features/conv"], "foldShapes": false}}),
+    );
+    let cnodes = col["nodes"].as_array().unwrap();
+    let mods: Vec<&Value> = cnodes.iter().filter(|n| n["kind"] == "module").collect();
+    assert_eq!(mods.len(), 1, "{:?}", mods);
+    assert_eq!(mods[0]["module"], "features");
+    assert_eq!(mods[0]["members"], 3);
+    assert_eq!(mods[0]["ids"], json!([0, 1, 2]));
+    assert_eq!(mods[0]["value"], -1);
+    assert_eq!(col["collapsedNodes"], 3);
+    assert!(!cnodes.iter().any(|n| n["title"] == "Conv" || n["title"] == "MaxPool"));
+    let module_index = cnodes.iter().position(|n| n["kind"] == "module").unwrap();
+    let input_index = cnodes.iter().position(|n| n["kind"] == "input").unwrap();
+    let cedges = col["edges"].as_array().unwrap();
+    assert!(cedges.iter().all(|e| e["from"] != e["to"]));
+    assert!(cedges
+        .iter()
+        .any(|e| e["from"] == input_index && e["to"] == module_index));
+    assert!(cedges.iter().any(|e| e["from"] == module_index));
+    for e in cedges {
+        assert!(e["points"].as_array().unwrap().len() >= 4, "edge without route: {}", e);
+    }
+    // Collapsing everything still yields a valid graph.
+    let all = call(
+        &ws,
+        "graph",
+        json!({"model": id, "graph": 0, "options": {"collapsed": ["features", "head"]}}),
+    );
+    let all_mods = all["nodes"].as_array().unwrap().iter().filter(|n| n["kind"] == "module").count();
+    assert_eq!(all_mods, 2);
+
     // Overrides make every shape concrete and enable FLOPs.
     let s2 = call(&ws, "setOverrides", json!({"model": id, "params": {"N": 2}}));
     assert_eq!(s2["outputs"][0]["shape"], json!([2, 10]));

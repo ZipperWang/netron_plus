@@ -18,6 +18,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   ml: '#2a6b5e',
   custom: '#8c2f39',
   other: '#4b4b4b',
+  module: '#3d4f7c',
   input: '#2d6a8a',
   output: '#6a3d9a',
   outer: '#6f6f68',

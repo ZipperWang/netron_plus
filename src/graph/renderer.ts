@@ -615,8 +615,20 @@ export class GraphRenderer {
       c.fillRect(n.x, n.y, n.w, n.h);
       return;
     }
-    const r = n.kind === 'op' ? 4 : 8;
+    const r = n.kind === 'op' || n.kind === 'module' ? 4 : 8;
     const hasBody = n.lines.length > 0 || n.name.length > 0;
+    if (n.kind === 'module') {
+      // Two offset cards behind the box mark a collapsed group of nodes.
+      c.lineWidth = this.full ? 1 : Math.max(1, 0.9 / this.scale);
+      c.strokeStyle = th.nodeBorder;
+      c.fillStyle = th.nodeBg;
+      for (const d of [6, 3]) {
+        c.beginPath();
+        roundRect(c, n.x + d, n.y + d, n.w, n.h, r);
+        c.fill();
+        c.stroke();
+      }
+    }
     c.beginPath();
     roundRect(c, n.x, n.y, n.w, n.h, r);
     if (!hasBody) {
