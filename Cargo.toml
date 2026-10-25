@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/wasm", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ZipperWang/netron_plus"
+
+[workspace.dependencies]
+prost = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+half = "2"
+anyhow = "1"
+
+[profile.release]
+opt-level = 3
+strip = true
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2

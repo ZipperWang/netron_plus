@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Netron Plus",
+  "version": "0.1.0",
+  "identifier": "io.github.zipperwang.netronplus",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Netron Plus",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "ZipperWang",
+    "category": "DeveloperTool",
+    "shortDescription": "ONNX model viewer and analyzer",
+    "longDescription": "View ONNX model architectures, operators and tensors, with shape inference, FLOPs, memory and weight statistics.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["onnx"],
+        "name": "ONNX Model",
+        "description": "ONNX Model",
+        "role": "Viewer"
+      }
+    ]
+  }
+}

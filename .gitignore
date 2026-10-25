@@ -1,0 +1,22 @@
+# Build outputs
+/target/
+/dist/
+/node_modules/
+/src-tauri/gen/
+/src-tauri/icons/
+/public/netron_core.wasm
+/samples/
+
+# Never commit model files (they may be private)
+*.onnx
+*.onnx.data
+*.ort
+*.pb
+*.tflite
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
