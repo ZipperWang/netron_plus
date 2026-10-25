@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { copyText } from '../store';
 
 const PATHS = {
@@ -322,7 +322,7 @@ export function SearchInput({
   onChange: (v: string) => void;
   placeholder: string;
   inputRef?: Ref<HTMLInputElement>;
-  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div className="search-input">

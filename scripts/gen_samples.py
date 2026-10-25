@@ -182,7 +182,7 @@ def fp16_detector(out, index):
         b.nodes,
         "fp16_detector",
         [helper.make_tensor_value_info("images", TensorProto.FLOAT16, [1, 3, 64, 64])],
-        [helper.make_tensor_value_info("output0", TensorProto.FLOAT16, [1, 3, 64, 6])],
+        [helper.make_tensor_value_info("output0", TensorProto.FLOAT16, [1, 3, 256, 6])],
         b.inits,
     )
     m = helper.make_model(g, opset_imports=[helper.make_opsetid("", 13)], producer_name="netron-plus-samples")
