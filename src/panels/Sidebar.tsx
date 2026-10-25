@@ -38,6 +38,7 @@ export function Sidebar() {
   const view = useStore((s) => s.view);
   const graphId = useStore((s) => s.graphId);
   const hierarchy = useStore((s) => s.hierarchy);
+  const width = useStore((s) => s.sidebarWidth);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +103,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{ width }}>
       <div className="sidebar-search">
         <SearchInput
           value={query}

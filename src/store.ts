@@ -41,7 +41,9 @@ export interface ViewOpts {
   showConstants: boolean;
   edgeLabels: boolean;
   detachLongEdges: boolean;
+  foldShapes: boolean;
   wheelZoom: boolean;
+  minimap: boolean;
 }
 
 export interface Toast {
@@ -74,6 +76,8 @@ interface State {
   lang: Lang;
   sidebar: boolean;
   inspector: boolean;
+  sidebarWidth: number;
+  inspectorWidth: number;
   recent: string[];
   focus: FocusRequest | null;
   toasts: Toast[];
@@ -94,7 +98,9 @@ const DEFAULT_VIEW: ViewOpts = {
   showConstants: false,
   edgeLabels: true,
   detachLongEdges: true,
+  foldShapes: true,
   wheelZoom: true,
+  minimap: true,
 };
 
 const PREFS_KEY = 'netron-plus.prefs.v1';
@@ -105,6 +111,8 @@ interface Prefs {
   viewOpts: ViewOpts;
   sidebar: boolean;
   inspector: boolean;
+  sidebarWidth: number;
+  inspectorWidth: number;
   recent: string[];
 }
 
@@ -115,6 +123,8 @@ function loadPrefs(): Prefs {
     viewOpts: { ...DEFAULT_VIEW },
     sidebar: true,
     inspector: true,
+    sidebarWidth: 260,
+    inspectorWidth: 340,
     recent: [],
   };
   try {
@@ -127,6 +137,8 @@ function loadPrefs(): Prefs {
       viewOpts: { ...DEFAULT_VIEW, ...(p.viewOpts ?? {}) },
       sidebar: p.sidebar ?? true,
       inspector: p.inspector ?? true,
+      sidebarWidth: typeof p.sidebarWidth === 'number' ? p.sidebarWidth : base.sidebarWidth,
+      inspectorWidth: typeof p.inspectorWidth === 'number' ? p.inspectorWidth : base.inspectorWidth,
       recent: Array.isArray(p.recent) ? p.recent.slice(0, 12) : [],
     };
   } catch {
@@ -142,6 +154,8 @@ function savePrefs(s: State) {
       viewOpts: s.viewOpts,
       sidebar: s.sidebar,
       inspector: s.inspector,
+      sidebarWidth: s.sidebarWidth,
+      inspectorWidth: s.inspectorWidth,
       recent: s.recent,
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(p));
@@ -169,6 +183,8 @@ export const useStore = create<State>()(() => ({
   lang: prefs.lang,
   sidebar: prefs.sidebar,
   inspector: prefs.inspector,
+  sidebarWidth: prefs.sidebarWidth,
+  inspectorWidth: prefs.inspectorWidth,
   recent: prefs.recent,
   focus: null,
   toasts: [],
@@ -198,6 +214,8 @@ useStore.subscribe((s, prev) => {
     s.viewOpts !== prev.viewOpts ||
     s.sidebar !== prev.sidebar ||
     s.inspector !== prev.inspector ||
+    s.sidebarWidth !== prev.sidebarWidth ||
+    s.inspectorWidth !== prev.inspectorWidth ||
     s.recent !== prev.recent
   ) {
     savePrefs(s);
@@ -430,6 +448,7 @@ export function setViewOpts(patch: Partial<ViewOpts>) {
     'showConstants',
     'edgeLabels',
     'detachLongEdges',
+    'foldShapes',
   ];
   if (layoutKeys.some((k) => k in patch)) void loadView(get().graphId, 'keep');
 }

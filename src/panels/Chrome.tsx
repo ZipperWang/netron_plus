@@ -228,7 +228,6 @@ export function StatusBar({ zoomHint }: { zoomHint?: string }) {
   const t = useT();
   const summary = useStore((s) => s.summary);
   const backend = useStore((s) => s.backend);
-  const view = useStore((s) => s.view);
   const loading = useStore((s) => s.loading);
   return (
     <footer className="statusbar">
@@ -243,9 +242,11 @@ export function StatusBar({ zoomHint }: { zoomHint?: string }) {
         <>
           <span>{t('status.nodes', { n: summary.stats.nodes.toLocaleString() })}</span>
           <span>{t('status.params', { n: fmtCount(summary.totals.params) })}</span>
-          <span>{t('status.flops', { n: fmtCount(summary.totals.flops) })}</span>
+          <span title={summary.totals.assumed.length ? t('sum.assumedHint', { dims: summary.totals.assumed.join(', ') }) : undefined}>
+            {t('status.flops', { n: fmtCount(summary.totals.flops) })}
+            {summary.totals.assumed.length > 0 && <span className="muted"> ({t('sum.assumed', { dims: summary.totals.assumed.join(', ') })})</span>}
+          </span>
           <span>{fmtBytes(summary.fileSize)}</span>
-          {view && view.nodes.length > 0 && <span className="muted">view {view.nodes.length} / {view.edges.length}</span>}
         </>
       )}
       <span className="spacer" />

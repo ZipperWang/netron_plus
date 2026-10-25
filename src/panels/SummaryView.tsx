@@ -25,6 +25,7 @@ export function SummaryView() {
   const tot = s.totals;
   const mem = s.memory;
   const stdOpset = s.opsets.find((o) => o.domain === 'ai.onnx' || o.domain === '')?.version;
+  const assumed = tot.assumed.length > 0 ? t('sum.assumed', { dims: tot.assumed.join(', ') }) : '';
 
   const opItems: BarItem[] = [...s.ops]
     .sort((a, b) => (metric === 'count' ? b.count - a.count : metric === 'flops' ? b.flops - a.flops : b.params - a.params))
@@ -67,9 +68,18 @@ export function SummaryView() {
           sub={s.stats.nodesTotal !== s.stats.nodes ? `${fmtInt(s.stats.nodesTotal)} · ${t('sum.graphs')} ${s.stats.graphs}` : undefined}
         />
         <Tile label={t('sum.params')} value={fmtCount(tot.params)} sub={fmtBytes(tot.paramBytes)} title={fmtInt(tot.params)} />
-        <Tile label={t('sum.flops')} value={fmtCount(tot.flops)} sub={`${t('sum.macs')} ${fmtCount(tot.macs)}`} title={fmtInt(tot.flops)} />
+        <Tile
+          label={t('sum.flops')}
+          value={fmtCount(tot.flops)}
+          sub={`${t('sum.macs')} ${fmtCount(tot.macs)}${assumed ? ` · ${assumed}` : ''}`}
+          title={fmtInt(tot.flops)}
+        />
         <Tile label={t('sum.weights')} value={fmtBytes(mem.weightsBytes)} />
-        <Tile label={t('sum.peak')} value={fmtBytes(mem.peakBytes)} sub={`${t('sum.activations')} ${fmtBytes(mem.activationBytes)}`} />
+        <Tile
+          label={t('sum.peak')}
+          value={fmtBytes(mem.peakBytes)}
+          sub={`${t('sum.activations')} ${fmtBytes(mem.activationBytes)}${assumed ? ` · ${assumed}` : ''}`}
+        />
         <Tile label={t('sum.opTypes')} value={fmtInt(s.stats.opTypes)} />
         <Tile label="Opset" value={stdOpset !== undefined ? String(stdOpset) : '–'} sub={`IR v${s.irVersion}`} />
         <Tile label={t('sum.fileSize')} value={fmtBytes(s.fileSize)} />
@@ -275,7 +285,9 @@ function SymbolEditor({ summary }: { summary: ModelSummary }) {
   return (
     <div className="symbols">
       <div className="card-subtitle">{t('sum.symbols')}</div>
-      <div className="muted small">{t('sum.symbolsHint')}</div>
+      <div className="muted small">
+        {summary.totals.assumed.length > 0 ? t('sum.assumedHint', { dims: summary.totals.assumed.join(', ') }) : t('sum.symbolsHint')}
+      </div>
       {summary.symbols.map((s) => (
         <div key={s.name} className="sym-row">
           <span className="mono sym-name">{s.name}</span>

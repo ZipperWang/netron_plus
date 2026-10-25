@@ -54,6 +54,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
   const pendingFocus = useRef<FocusRequest | null>(null);
   const needsCamera = useRef(false);
   const [zoom, setZoom] = useState(100);
+  const [narrow, setNarrow] = useState(false);
   const [tip, setTip] = useState<Tip | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
@@ -124,6 +125,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
       if (w === 0 || h === 0) return;
+      setNarrow(w < 620 || h < 420);
       if (w !== r.width || h !== r.height) {
         r.resize(w, h);
         mm.rebuild();
@@ -214,6 +216,11 @@ export function GraphPane({ visible }: { visible: boolean }) {
     r.showLabels = viewOpts.edgeLabels;
     r.requestDraw();
   }, [viewOpts.edgeLabels]);
+
+  const showMinimap = viewOpts.minimap && !narrow;
+  useEffect(() => {
+    if (showMinimap) requestAnimationFrame(() => mmRef.current?.rebuild());
+  }, [showMinimap]);
 
   // Selection.
   useEffect(() => {
@@ -593,7 +600,9 @@ export function GraphPane({ visible }: { visible: boolean }) {
     { label: t('opt.showConstants'), checked: viewOpts.showConstants, onClick: () => setViewOpts({ showConstants: !viewOpts.showConstants }) },
     { label: t('opt.edgeLabels'), checked: viewOpts.edgeLabels, onClick: () => setViewOpts({ edgeLabels: !viewOpts.edgeLabels }) },
     { label: t('opt.detachLongEdges'), checked: viewOpts.detachLongEdges, onClick: () => setViewOpts({ detachLongEdges: !viewOpts.detachLongEdges }) },
+    { label: t('opt.foldShapes'), checked: viewOpts.foldShapes, onClick: () => setViewOpts({ foldShapes: !viewOpts.foldShapes }) },
     { separator: true },
+    { label: t('opt.minimap'), checked: viewOpts.minimap, onClick: () => setViewOpts({ minimap: !viewOpts.minimap }) },
     { label: t('opt.wheelZoom'), checked: viewOpts.wheelZoom, onClick: () => setViewOpts({ wheelZoom: !viewOpts.wheelZoom }) },
   ];
 
@@ -685,6 +694,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
       <canvas
         ref={miniRef}
         className="minimap"
+        style={{ display: showMinimap ? undefined : 'none' }}
         onPointerDown={(e) => {
           mmDrag.current = true;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -696,8 +706,15 @@ export function GraphPane({ visible }: { visible: boolean }) {
         }}
       />
       {view && view.nodes.length === 0 && <div className="graph-empty">{t('graph.empty')}</div>}
-      {view && view.hiddenConstants > 0 && !viewOpts.showConstants && (
-        <div className="graph-note">{t('graph.hiddenConstants', { n: view.hiddenConstants })}</div>
+      {view && (view.hiddenConstants > 0 || view.foldedNodes > 0) && (
+        <div className="graph-note">
+          {[
+            view.hiddenConstants > 0 ? t('graph.hiddenConstants', { n: view.hiddenConstants }) : '',
+            view.foldedNodes > 0 ? t('graph.foldedNodes', { n: view.foldedNodes }) : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
       )}
       {viewLoading && (
         <div className="graph-busy">

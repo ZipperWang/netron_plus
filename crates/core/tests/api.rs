@@ -169,6 +169,9 @@ fn full_api_roundtrip() {
     let params = summary["totals"]["params"].as_u64().unwrap();
     assert_eq!(params, 8 * 27 + 8 + 10 * 2048 + 10 + 4);
     assert!(summary["symbols"].as_array().unwrap().iter().any(|s| s["name"] == "N"));
+    // Costs are estimated with the dynamic batch taken as 1.
+    assert_eq!(summary["totals"]["assumed"], json!(["N"]));
+    assert!(summary["totals"]["flops"].as_u64().unwrap() > 0);
 
     // Shapes through the Shape→Gather→Unsqueeze→Concat→Reshape pattern.
     let values = call(&ws, "valueTable", json!({"model": id, "graph": 0}));
@@ -188,6 +191,18 @@ fn full_api_roundtrip() {
     for e in view["edges"].as_array().unwrap() {
         assert!(e["points"].as_array().unwrap().len() >= 4, "edge without route: {}", e);
     }
+    // Shape → Gather → Unsqueeze → Concat is folded into the Reshape node.
+    assert_eq!(view["foldedNodes"], 4);
+    assert!(!vnodes.iter().any(|n| n["title"] == "Shape"));
+    let reshape = vnodes.iter().find(|n| n["title"] == "Reshape").unwrap();
+    assert!(
+        reshape["lines"].as_array().unwrap().iter().any(|l| l["v"] == "= [N, -1]"),
+        "{}",
+        reshape
+    );
+    let unfolded = call(&ws, "graph", json!({"model": id, "graph": 0, "options": {"foldShapes": false}}));
+    assert_eq!(unfolded["foldedNodes"], 0);
+    assert!(unfolded["nodes"].as_array().unwrap().iter().any(|n| n["title"] == "Shape"));
 
     // Overrides make every shape concrete and enable FLOPs.
     let s2 = call(&ws, "setOverrides", json!({"model": id, "params": {"N": 2}}));

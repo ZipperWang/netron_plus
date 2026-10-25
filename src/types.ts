@@ -111,6 +111,7 @@ export interface Totals {
   costedNodes: number;
   uncostedNodes: number;
   uncostedOps: string[];
+  assumed: string[];
 }
 
 export interface ModelSummary {
@@ -185,6 +186,7 @@ export interface GraphView {
   width: number;
   height: number;
   hiddenConstants: number;
+  foldedNodes: number;
 }
 
 export interface NodeRef {

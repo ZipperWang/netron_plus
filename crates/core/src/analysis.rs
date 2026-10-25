@@ -4,7 +4,7 @@ use crate::cost::{node_cost, NodeCost};
 use crate::dtype;
 use crate::infer::{self, GraphShapes, Overrides};
 use crate::model::{Model, ValueKind};
-use crate::shape::numel;
+use crate::shape::{numel, Dim};
 use crate::tensor;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -34,6 +34,8 @@ pub struct Totals {
     pub costed_nodes: usize,
     pub uncosted_nodes: usize,
     pub uncosted_ops: Vec<String>,
+    /// Dynamic input dimensions that were taken as 1 for costs and memory.
+    pub assumed: Vec<String>,
 }
 
 pub struct Analysis {
@@ -46,14 +48,25 @@ pub struct Analysis {
 
 pub fn analyze(model: &Model, overrides: Overrides) -> Analysis {
     let shapes = infer::infer(model, &overrides);
+    // Shapes shown to the user keep symbolic dimensions; costs and memory
+    // are computed with every still-dynamic input dimension taken as 1.
+    let (assumed, cost_overrides) = assume_dynamic(model, &overrides);
+    let cost_owned: Vec<GraphShapes>;
+    let cost_shapes: &[GraphShapes] = if assumed.is_empty() {
+        &shapes
+    } else {
+        cost_owned = infer::infer(model, &cost_overrides);
+        &cost_owned
+    };
     let costs: Vec<Vec<NodeCost>> = model
         .graphs
         .iter()
-        .zip(&shapes)
+        .zip(cost_shapes)
         .map(|(g, s)| g.nodes.iter().map(|n| node_cost(g, n, &s.states)).collect())
         .collect();
-    let totals = compute_totals(model, &costs);
-    let memory = compute_memory(model, &shapes[0]);
+    let mut totals = compute_totals(model, &costs);
+    totals.assumed = assumed;
+    let memory = compute_memory(model, &cost_shapes[0]);
     Analysis {
         overrides,
         shapes,
@@ -61,6 +74,51 @@ pub fn analyze(model: &Model, overrides: Overrides) -> Analysis {
         memory,
         totals,
     }
+}
+
+/// Overrides that additionally set every unresolved dynamic dimension of the
+/// main graph inputs to 1, plus the names of those dimensions.
+fn assume_dynamic(model: &Model, ov: &Overrides) -> (Vec<String>, Overrides) {
+    let main = model.main();
+    let mut out = ov.clone();
+    let mut assumed = Vec::new();
+    for &vid in &main.inputs {
+        let v = &main.values[vid];
+        if v.kind != ValueKind::Input {
+            continue;
+        }
+        let Some(shape) = v.declared.as_ref().and_then(|d| d.shape.as_ref()) else {
+            continue;
+        };
+        let mut per: Vec<Option<i64>> = ov.inputs.get(&v.name).cloned().unwrap_or_default();
+        if per.len() < shape.len() {
+            per.resize(shape.len(), None);
+        }
+        let mut changed = false;
+        for (i, d) in shape.iter().enumerate() {
+            if per[i].is_some() {
+                continue;
+            }
+            match d {
+                Dim::Param(p) => {
+                    if !out.params.contains_key(p) {
+                        out.params.insert(p.clone(), 1);
+                        assumed.push(p.clone());
+                    }
+                }
+                Dim::Unknown => {
+                    per[i] = Some(1);
+                    changed = true;
+                    assumed.push(format!("{}[{}]", v.name, i));
+                }
+                Dim::Known(_) => {}
+            }
+        }
+        if changed {
+            out.inputs.insert(v.name.clone(), per);
+        }
+    }
+    (assumed, out)
 }
 
 fn compute_totals(model: &Model, costs: &[Vec<NodeCost>]) -> Totals {

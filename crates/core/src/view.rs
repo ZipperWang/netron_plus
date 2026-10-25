@@ -6,7 +6,7 @@ use crate::format;
 use crate::layout::{self, LEdge, LNode, LayoutParams};
 use crate::model::{module_path, Graph, GraphId, Model, ValueKind};
 use crate::ops;
-use crate::shape;
+use crate::shape::{self, Dim};
 use crate::tensor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -73,6 +73,9 @@ pub struct ViewOptions {
     pub show_constants: bool,
     pub edge_labels: bool,
     pub detach_long_edges: bool,
+    /// Hide nodes that only compute known shape values (Shape → Gather →
+    /// Concat ...) and show the computed values inside their consumers.
+    pub fold_shapes: bool,
     pub max_attributes: usize,
     pub metrics: FontMetrics,
 }
@@ -86,6 +89,7 @@ impl Default for ViewOptions {
             show_constants: false,
             edge_labels: true,
             detach_long_edges: true,
+            fold_shapes: true,
             max_attributes: 8,
             metrics: FontMetrics::default(),
         }
@@ -145,6 +149,7 @@ pub struct GraphView {
     pub width: f64,
     pub height: f64,
     pub hidden_constants: usize,
+    pub folded_nodes: usize,
 }
 
 fn weight_line(g: &Graph, vid: usize, label: String) -> ViewLine {
@@ -174,6 +179,17 @@ fn weight_line(g: &Graph, vid: usize, label: String) -> ViewLine {
     }
 }
 
+fn contents_label(d: &[Dim], scalar: bool) -> String {
+    if scalar && d.len() == 1 {
+        return format!("= {}", d[0].label());
+    }
+    let mut parts: Vec<String> = d.iter().take(8).map(Dim::label).collect();
+    if d.len() > 8 {
+        parts.push(format!("… +{}", d.len() - 8));
+    }
+    format!("= [{}]", parts.join(", "))
+}
+
 pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions) -> anyhow::Result<GraphView> {
     let g = model.graph(gid)?;
     let st = &an.shapes[gid].states;
@@ -182,13 +198,34 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
     let mut node_view: Vec<Option<usize>> = vec![None; g.nodes.len()];
     let mut value_view: HashMap<usize, usize> = HashMap::new();
     let mut hidden_constants = 0usize;
+    let mut folded_nodes = 0usize;
 
+    // Values whose contents shape inference fully determined (shape
+    // arithmetic); nodes producing only such values can be folded away.
+    let known_contents = |vid: usize| -> bool {
+        let v = &g.values[vid];
+        v.kind == ValueKind::Intermediate
+            && !v.is_output
+            && matches!(&st[vid].ints, Some(c) if c.len() <= 32 && c.iter().all(|d| !d.is_unknown()))
+    };
+    let mut folded = vec![false; g.nodes.len()];
+    if opt.fold_shapes {
+        for (ni, node) in g.nodes.iter().enumerate() {
+            let mut outs = node.outputs.iter().flatten().peekable();
+            if node.subgraphs.is_empty() && outs.peek().is_some() && outs.all(|&o| known_contents(o)) {
+                folded[ni] = true;
+            }
+        }
+    }
+    let folded_value = |vid: usize| -> bool {
+        g.values[vid].producer.map_or(false, |(p, _)| folded[p])
+    };
     let embedded = |vid: usize| -> bool {
         let v = &g.values[vid];
         match v.kind {
             ValueKind::Initializer => true,
             ValueKind::Constant => !opt.show_constants,
-            _ => false,
+            _ => folded_value(vid),
         }
     };
 
@@ -250,13 +287,25 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
                 }
             }
         }
+        if folded[ni] {
+            folded_nodes += 1;
+            continue;
+        }
         let mut lines = Vec::new();
         if opt.show_initializers {
             for (slot, inp) in node.inputs.iter().enumerate() {
-                if let Some(vid) = *inp {
-                    if embedded(vid) {
-                        lines.push(weight_line(g, vid, ops::input_name(&node.domain, &node.op_type, slot)));
-                    }
+                let Some(vid) = *inp else { continue };
+                let label = ops::input_name(&node.domain, &node.op_type, slot);
+                if folded_value(vid) {
+                    let scalar = st[vid].shape.as_ref().map_or(false, |s| s.is_empty());
+                    let text = contents_label(st[vid].ints.as_deref().unwrap_or(&[]), scalar);
+                    lines.push(ViewLine {
+                        k: label,
+                        v: text,
+                        value: vid as i64,
+                    });
+                } else if embedded(vid) {
+                    lines.push(weight_line(g, vid, label));
                 }
             }
         }
@@ -461,17 +510,18 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
         n.x = lay.x[i] - n.w / 2.0;
         n.y = lay.y[i] - n.h / 2.0;
     }
+    // A tensor feeding several nodes is labeled once (on its first routed edge).
+    let mut labeled: std::collections::HashSet<(usize, usize)> = std::collections::HashSet::new();
     let edges: Vec<ViewEdge> = pending
         .iter()
         .enumerate()
         .map(|(i, e)| {
-            let label = if opt.edge_labels {
-                match st[e.value].shape.as_deref() {
-                    Some(s) => shape::dims_label(Some(s)),
-                    None => String::new(),
+            let routed = !lay.detached[i] && !lay.points[i].is_empty();
+            let label = match st[e.value].shape.as_deref() {
+                Some(s) if opt.edge_labels && !s.is_empty() && routed && labeled.insert((e.from, e.value)) => {
+                    shape::dims_label(Some(s))
                 }
-            } else {
-                String::new()
+                _ => String::new(),
             };
             ViewEdge {
                 from: e.from,
@@ -494,5 +544,6 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
         width: lay.width,
         height: lay.height,
         hidden_constants,
+        folded_nodes,
     })
 }

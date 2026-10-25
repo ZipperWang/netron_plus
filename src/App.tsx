@@ -18,7 +18,7 @@ import { Sidebar, focusSearch } from './panels/Sidebar';
 import { SummaryView } from './panels/SummaryView';
 import { ChecksView, NodesView, OperatorsView, TensorsView, WeightsView } from './panels/TableViews';
 import { HelpDialog, StatusBar, Toasts, Toolbar, Welcome } from './panels/Chrome';
-import { Icon, Spinner } from './components/common';
+import { Icon, Resizer, Spinner } from './components/common';
 
 function isEditable(el: Element | null): boolean {
   if (!el) return false;
@@ -32,6 +32,8 @@ export default function App() {
   const tab = useStore((s) => s.tab);
   const sidebar = useStore((s) => s.sidebar);
   const inspector = useStore((s) => s.inspector);
+  const sidebarWidth = useStore((s) => s.sidebarWidth);
+  const inspectorWidth = useStore((s) => s.inspectorWidth);
   const loading = useStore((s) => s.loading);
   const dropping = useStore((s) => s.dropping);
   const backend = useStore((s) => s.backend);
@@ -156,6 +158,9 @@ export default function App() {
         {summary ? (
           <>
             {sidebar && <Sidebar />}
+            {sidebar && (
+              <Resizer value={sidebarWidth} min={180} max={520} onChange={(v) => useStore.setState({ sidebarWidth: v })} />
+            )}
             <section className="center">
               <GraphPane visible={tab === 'graph'} />
               {tab === 'summary' && <SummaryView />}
@@ -165,6 +170,15 @@ export default function App() {
               {tab === 'weights' && <WeightsView />}
               {tab === 'checks' && <ChecksView />}
             </section>
+            {inspector && (
+              <Resizer
+                value={inspectorWidth}
+                min={260}
+                max={640}
+                invert
+                onChange={(v) => useStore.setState({ inspectorWidth: v })}
+              />
+            )}
             {inspector && <Inspector />}
           </>
         ) : (

@@ -291,7 +291,7 @@ export class GraphRenderer {
       this.fit();
       return;
     }
-    const s = Math.max(0.6, Math.min(1, (this.width - 64) / Math.max(1, v.width)));
+    const s = Math.min(1, Math.max(0.8, (this.width - 64) / Math.max(1, v.width)));
     let top = v.nodes[0];
     for (const n of v.nodes) {
       if (n.y < top.y - 0.5 || (Math.abs(n.y - top.y) < 0.5 && n.kind === 'input' && top.kind !== 'input')) top = n;

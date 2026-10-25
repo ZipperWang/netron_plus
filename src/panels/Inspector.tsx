@@ -41,9 +41,10 @@ export function Inspector() {
   const t = useT();
   const selection = useStore((s) => s.selection);
   const summary = useStore((s) => s.summary);
+  const width = useStore((s) => s.inspectorWidth);
   if (!summary) return null;
   return (
-    <aside className="inspector">
+    <aside className="inspector" style={{ width }}>
       <div className="panel-title">
         <span>{t('insp.title')}</span>
         {selection && <IconButton icon="x" size={13} title={t('common.close')} onClick={() => select(null)} />}

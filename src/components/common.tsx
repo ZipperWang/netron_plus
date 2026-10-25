@@ -339,3 +339,42 @@ export function SearchInput({
     </div>
   );
 }
+
+/** Vertical drag handle that resizes an adjacent side panel. */
+export function Resizer({
+  value,
+  onChange,
+  min,
+  max,
+  invert,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  invert?: boolean;
+}) {
+  const start = useRef<{ x: number; w: number } | null>(null);
+  return (
+    <div
+      className="resizer"
+      role="separator"
+      aria-orientation="vertical"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        start.current = { x: e.clientX, w: value };
+        document.body.classList.add('resizing');
+      }}
+      onPointerMove={(e) => {
+        const st = start.current;
+        if (!st) return;
+        const dx = e.clientX - st.x;
+        onChange(Math.round(Math.min(max, Math.max(min, st.w + (invert ? -dx : dx)))));
+      }}
+      onPointerUp={() => {
+        start.current = null;
+        document.body.classList.remove('resizing');
+      }}
+    />
+  );
+}
