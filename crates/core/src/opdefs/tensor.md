@@ -87,18 +87,22 @@ sym: \text{batch\_dims} = attr:batch_dims ?= 0
 sym: \operatorname{shape}(\text{indices}) = in:indices.shape
 
 ## ScatterND
-en: Copies data and writes updates at the positions given by indices.
-zh: 复制 data，并在 indices 指定的位置写入 updates。
+en: Copies data and combines updates into the positions given by indices according to reduction.
+zh: 复制 data，并按 reduction 把 updates 合并到 indices 指定的位置。
+note.en: With reduction = none, duplicate indices give an undefined result; max and min exist since opset 18.
+note.zh: reduction = none 时重复索引的结果未定义；max 与 min 自 opset 18 起支持。
 ```tex
-\text{output} = \text{data}, \qquad \text{output}\left[\text{indices}_{\mathbf{i}}\right] \leftarrow \text{updates}_{\mathbf{i}}
+\text{output} = \text{data}, \qquad o \leftarrow \begin{cases} u, & \texttt{none} \\ o + u, & \texttt{add} \\ o \cdot u, & \texttt{mul} \\ \max(o,\, u), & \texttt{max} \\ \min(o,\, u), & \texttt{min} \end{cases} \qquad o = \text{output}\left[\text{indices}_{\mathbf{i}}\right],\ u = \text{updates}_{\mathbf{i}}
 ```
 sym: \text{reduction} = attr:reduction ?= \texttt{none}
 
 ## ScatterElements
-en: Copies data and writes each update along an axis at its index.
-zh: 复制 data，并沿指定轴把每个 update 写到对应索引处。
+en: Copies data and combines each update along an axis at its index according to reduction.
+zh: 复制 data，并按 reduction 沿指定轴把每个 update 合并到对应索引处。
+note.en: With reduction = none, duplicate indices give an undefined result; max and min exist since opset 18.
+note.zh: reduction = none 时重复索引的结果未定义；max 与 min 自 opset 18 起支持。
 ```tex
-\text{output}_{\ldots,\; \text{indices}_{\mathbf{i}},\; \ldots} \leftarrow \text{updates}_{\mathbf{i}} \quad (\text{index replaced at axis})
+\text{output} = \text{data}, \qquad o \leftarrow \begin{cases} u, & \texttt{none} \\ o + u, & \texttt{add} \\ o \cdot u, & \texttt{mul} \\ \max(o,\, u), & \texttt{max} \\ \min(o,\, u), & \texttt{min} \end{cases} \qquad o = \text{output}_{\ldots,\; \text{indices}_{\mathbf{i}},\; \ldots},\ u = \text{updates}_{\mathbf{i}}
 ```
 sym: \text{axis} = attr:axis ?= 0
 sym: \text{reduction} = attr:reduction ?= \texttt{none}

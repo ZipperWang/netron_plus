@@ -6,10 +6,12 @@
 ## ReduceSum
 en: Sum over the given axes (all axes when empty).
 zh: 在给定轴上求和（未给出时对所有轴）。
+note.en: An empty or missing axes means all axes, unless noop_with_empty_axes = 1 makes the node an identity.
+note.zh: axes 为空或缺省时对所有轴规约；若 noop_with_empty_axes = 1，则该节点为恒等映射。
 ```tex
 Y = \sum_{\mathcal{A}} X
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 sym: \text{noop\_with\_empty\_axes} = attr:noop_with_empty_axes ?= 0
 sym: \operatorname{shape}(X) = in:data.shape
@@ -20,7 +22,7 @@ zh: 在给定轴上求平均（未给出时对所有轴）。
 ```tex
 Y = \frac{1}{N_{\mathcal{A}}} \sum_{\mathcal{A}} X, \qquad N_{\mathcal{A}} = \prod_{a \in \mathcal{A}} d_a
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 sym: (d_0, \ldots) = in:data.shape
 
@@ -30,7 +32,7 @@ zh: 在给定轴上取最大值。
 ```tex
 Y = \max_{\mathcal{A}} X
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceMin
@@ -39,7 +41,7 @@ zh: 在给定轴上取最小值。
 ```tex
 Y = \min_{\mathcal{A}} X
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceProd
@@ -48,7 +50,7 @@ zh: 在给定轴上求积。
 ```tex
 Y = \prod_{\mathcal{A}} X
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceL1
@@ -57,7 +59,7 @@ zh: 在给定轴上求 L1 范数。
 ```tex
 Y = \sum_{\mathcal{A}} \lvert X \rvert
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceL2
@@ -66,7 +68,7 @@ zh: 在给定轴上求 L2 范数。
 ```tex
 Y = \sqrt{\sum_{\mathcal{A}} X^{2}}
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceSumSquare
@@ -75,7 +77,7 @@ zh: 在给定轴上求平方和。
 ```tex
 Y = \sum_{\mathcal{A}} X^{2}
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceLogSum
@@ -84,7 +86,7 @@ zh: 在给定轴上求和后取对数。
 ```tex
 Y = \ln \sum_{\mathcal{A}} X
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ReduceLogSumExp
@@ -93,7 +95,7 @@ zh: 在给定轴上计算 log-sum-exp。
 ```tex
 Y = \ln \sum_{\mathcal{A}} e^{X}
 ```
-sym: \mathcal{A} = in:axes.value, attr:axes ?= \text{all axes}
+sym: \mathcal{A} = reduce:axes ?= \text{all axes}
 sym: \text{keepdims} = attr:keepdims ?= 1
 
 ## ArgMax

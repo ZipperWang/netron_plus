@@ -492,6 +492,63 @@ fn local_functions_link_to_call_sites() {
 }
 
 #[test]
+fn reduction_axes_follow_noop_flag() {
+    let reduce = |op: &str, name: &str, inputs: &[&str], noop: Option<i64>| {
+        let attrs = noop.map(|v| vec![attr_int("noop_with_empty_axes", v)]).unwrap_or_default();
+        node(op, name, inputs, &[name], attrs)
+    };
+    let graph = GraphProto {
+        name: "reduce".into(),
+        node: vec![
+            reduce("ReduceSum", "noop", &["x"], Some(1)),
+            reduce("ReduceSum", "empty", &["x", "none"], None),
+            reduce("ReduceSum", "given", &["x", "ax"], Some(1)),
+            reduce("ReduceMax", "omitted", &["x"], None),
+        ],
+        initializer: vec![
+            TensorProto {
+                name: "none".into(),
+                dims: vec![0],
+                data_type: 7,
+                ..Default::default()
+            },
+            int_tensor("ax", &[1]),
+        ],
+        input: vec![vi("x", tensor_type(1, vec![dim(2), dim(3)]))],
+        output: ["noop", "empty", "given", "omitted"]
+            .iter()
+            .map(|n| ValueInfoProto {
+                name: n.to_string(),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let model = ModelProto {
+        ir_version: 8,
+        opset_import: vec![OperatorSetIdProto {
+            domain: String::new(),
+            version: 18,
+        }],
+        graph: Some(graph),
+        ..Default::default()
+    };
+    let ws = Workspace::new();
+    let (id, _) = open(&ws, model.encode_to_vec());
+    let axes = |n: usize| {
+        let f = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": n}));
+        symbol(&f, r"\mathcal{A}")["value"].as_str().unwrap().to_string()
+    };
+    // Missing axes with noop_with_empty_axes = 1: identity.
+    assert_eq!(axes(0), r"\varnothing\ (\text{identity})");
+    // An empty axes tensor with the default flag reduces every axis.
+    assert_eq!(axes(1), r"(0,\, 1)");
+    // Given axes win over the flag.
+    assert_eq!(axes(2), "(1)");
+    assert_eq!(axes(3), r"(0,\, 1)");
+}
+
+#[test]
 fn rejects_garbage() {
     let ws = Workspace::new();
     assert!(ws

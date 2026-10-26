@@ -17,7 +17,8 @@
 //!   are tried in order: `attr:<name>`, `dtype:<attr>` (an int attribute
 //!   holding a data type), or `in:<slot>.<prop>` / `out:<slot>.<prop>` where
 //!   `<prop>` is `shape`, `shape[i]`, `shape[a:b]`, `rank`, `dtype` or
-//!   `value` (contents of small constant or shape-derived tensors). The
+//!   `value` (contents of small constant or shape-derived tensors), or
+//!   `reduce:axes` (the axes a Reduce* node actually reduces over). The
 //!   optional default is TeX shown when no source is available.
 
 use crate::analysis::Analysis;
@@ -74,12 +75,16 @@ enum Source {
     Attr(String),
     AttrDtype(String),
     Slot { side: Side, slot: String, prop: Prop },
+    /// Effective axes of a reduction (axes input or attribute, and
+    /// noop_with_empty_axes).
+    ReduceAxes,
 }
 
 impl Source {
     fn label(&self) -> String {
         match self {
             Source::Attr(n) | Source::AttrDtype(n) => n.clone(),
+            Source::ReduceAxes => "axes".to_string(),
             Source::Slot { slot, prop, .. } => match prop {
                 Prop::Shape => format!("{}.shape", slot),
                 Prop::Dim(i) => format!("{}.shape[{}]", slot, i),
@@ -95,7 +100,7 @@ impl Source {
     fn kind(&self) -> &'static str {
         match self {
             Source::Attr(_) | Source::AttrDtype(_) => "attr",
-            Source::Slot { side: Side::Input, .. } => "input",
+            Source::Slot { side: Side::Input, .. } | Source::ReduceAxes => "input",
             Source::Slot { side: Side::Output, .. } => "output",
         }
     }
@@ -193,6 +198,9 @@ fn parse_source(s: &str) -> Result<Source, String> {
     }
     if let Some(n) = s.strip_prefix("dtype:") {
         return name(n).map(Source::AttrDtype);
+    }
+    if s == "reduce:axes" {
+        return Ok(Source::ReduceAxes);
     }
     let (side, rest) = if let Some(r) = s.strip_prefix("in:") {
         (Side::Input, r)
@@ -660,6 +668,44 @@ impl Binder<'_> {
                     None => Eval::Absent,
                 }
             }
+            Source::ReduceAxes => self.reduce_axes(),
+        }
+    }
+
+    /// The axes a Reduce* node reduces over: the axes attribute (before
+    /// opset 18) or input, where empty or missing means every axis unless
+    /// noop_with_empty_axes makes the node an identity.
+    fn reduce_axes(&self) -> Eval {
+        let n = self.node;
+        if let Some(a) = n.attributes.iter().find(|a| a.name == "axes") {
+            if !a.ref_attr_name.is_empty() {
+                return Eval::Unknown(Some(format!("axes = @{}", a.ref_attr_name)));
+            }
+        }
+        let (axes, source) = match n.attr_ints("axes") {
+            Some(v) => (v.iter().map(|a| a.to_string()).collect::<Vec<_>>(), "set"),
+            None => match self.slot_value(Side::Input, "axes") {
+                Some(vid) => match self.states.get(vid).and_then(|st| st.ints.as_ref()) {
+                    Some(v) => (v.iter().map(tex::dim).collect(), "derived"),
+                    None => return Eval::Unknown(None),
+                },
+                None => (Vec::new(), "derived"),
+            },
+        };
+        if !axes.is_empty() {
+            return Eval::Found(tex::tuple(axes), source);
+        }
+        if n.attr_i("noop_with_empty_axes") == Some(1) {
+            return Eval::Found(r"\varnothing\ (\text{identity})".to_string(), "derived");
+        }
+        let rank = n
+            .input(0)
+            .and_then(|vid| self.states.get(vid))
+            .and_then(|st| st.shape.as_ref())
+            .map(|s| s.len());
+        match rank {
+            Some(r) => Eval::Found(tex::tuple((0..r).map(|i| i.to_string())), "derived"),
+            None => Eval::Found(r"\text{all axes}".to_string(), "default"),
         }
     }
 }
@@ -769,6 +815,7 @@ mod tests {
         assert_eq!(s.sources[1].label(), "W.shape[2:]");
         let d = parse_symbol("C = in:X.shape[-1]").unwrap();
         assert_eq!(d.sources[0], Source::Slot { side: Side::Input, slot: "X".into(), prop: Prop::Dim(-1) });
+        assert_eq!(parse_symbol(r"A = reduce:axes").unwrap().sources[0], Source::ReduceAxes);
         assert!(parse_symbol(r"\alpha").is_err());
         assert!(parse_symbol(r"\alpha = attr:").is_err());
         assert!(parse_symbol(r"\alpha = in:X.size").is_err());
