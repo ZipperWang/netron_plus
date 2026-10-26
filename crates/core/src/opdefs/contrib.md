@@ -114,7 +114,7 @@ sym: \operatorname{shape}(A) = in:A.shape
 en: Multi-head self-attention with a fused QKV projection.
 zh: 融合 QKV 投影的多头自注意力。
 ```tex
-[Q, K, V] = \text{input} \cdot W + b, \qquad \text{output} = \softmax\left(\frac{Q K^{\top}}{\sqrt{d}} + M\right) V
+[Q, K, V] = \text{input} \cdot W + b, \qquad \text{output} = \softmax\left(\text{scale} \cdot Q K^{\top} + M\right) V, \qquad \text{scale} = \frac{1}{\sqrt{d}} \text{ by default}
 ```
 sym: h = attr:num_heads
 sym: \text{unidirectional} = attr:unidirectional ?= 0

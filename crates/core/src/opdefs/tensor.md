@@ -142,9 +142,13 @@ sym: \operatorname{shape}(Y) = out:expanded.shape
 en: Flattens into a 2-D matrix split at axis.
 zh: 在 axis 处分开，展平成二维矩阵。
 ```tex
-Y = \operatorname{reshape}\left(X,\, \Bigl(\prod_{k < \text{axis}} d_k,\ \prod_{k \ge \text{axis}} d_k\Bigr)\right)
+Y = \operatorname{reshape}\left(X,\, \Bigl(\prod_{k < \bar{a}} d_k,\ \prod_{k \ge \bar{a}} d_k\Bigr)\right)
+```
+```tex where
+\bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}
 ```
 sym: \text{axis} = attr:axis ?= 1
+sym: r = in:input.rank
 sym: (d_0, \ldots) = in:input.shape
 
 ## Expand

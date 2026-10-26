@@ -165,9 +165,13 @@ zh: 先在 axis 处把输入压成二维，再按行做 softmax（opset < 13）�
 note.en: Opset 13 changed the semantics to a softmax along a single axis.
 note.zh: opset 13 起语义改为沿单个轴做 softmax，导出时需注意版本差异。
 ```tex
-Y_{n,i} = \frac{e^{X_{n,i}}}{\sum_{j=0}^{D-1} e^{X_{n,j}}}, \qquad N = \prod_{k < \text{axis}} d_k,\quad D = \prod_{k \ge \text{axis}} d_k
+Y_{n,i} = \frac{e^{X_{n,i}}}{\sum_{j=0}^{D-1} e^{X_{n,j}}}, \qquad N = \prod_{k < \bar{a}} d_k,\quad D = \prod_{k \ge \bar{a}} d_k
+```
+```tex where
+\bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}
 ```
 sym: \text{axis} = attr:axis ?= 1
+sym: r = in:input.rank
 sym: (d_0, \ldots) = in:input.shape
 
 ## Softmax
@@ -189,9 +193,13 @@ zh: 先在 axis 处把输入压成二维，再按行计算 log-softmax（opset <
 note.en: Opset 13 changed the semantics to a single axis.
 note.zh: opset 13 起语义改为沿单个轴计算。
 ```tex
-Y_{n,i} = X_{n,i} - \ln \sum_{j=0}^{D-1} e^{X_{n,j}}, \qquad N = \prod_{k < \text{axis}} d_k,\quad D = \prod_{k \ge \text{axis}} d_k
+Y_{n,i} = X_{n,i} - \ln \sum_{j=0}^{D-1} e^{X_{n,j}}, \qquad N = \prod_{k < \bar{a}} d_k,\quad D = \prod_{k \ge \bar{a}} d_k
+```
+```tex where
+\bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}
 ```
 sym: \text{axis} = attr:axis ?= 1
+sym: r = in:input.rank
 sym: (d_0, \ldots) = in:input.shape
 
 ## LogSoftmax
@@ -208,9 +216,13 @@ since: 1
 en: One-hot of the first maximum of each row, with the input coerced to 2-D at axis (opset < 13).
 zh: 先在 axis 处把输入压成二维，每行第一个最大值位置为 1、其余为 0（opset < 13）。
 ```tex
-Y_{n,i} = \begin{cases} 1, & i = \argmax_{j} X_{n,j} \\ 0, & \text{otherwise} \end{cases}, \qquad N = \prod_{k < \text{axis}} d_k,\quad D = \prod_{k \ge \text{axis}} d_k
+Y_{n,i} = \begin{cases} 1, & i = \argmax_{j} X_{n,j} \\ 0, & \text{otherwise} \end{cases}, \qquad N = \prod_{k < \bar{a}} d_k,\quad D = \prod_{k \ge \bar{a}} d_k
+```
+```tex where
+\bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}
 ```
 sym: \text{axis} = attr:axis ?= 1
+sym: r = in:input.rank
 sym: (d_0, \ldots) = in:input.shape
 
 ## Hardmax

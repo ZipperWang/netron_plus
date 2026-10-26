@@ -23,7 +23,7 @@ zh: 层归一化，对从 axis 开始的所有尾部维度做归一化。
 Y = \frac{X - \mu}{\sqrt{\sigma^{2} + \epsilon}} \odot \text{Scale} + B, \qquad \mu = \frac{1}{D} \sum_{i \in \mathcal{A}} X_i, \quad \sigma^{2} = \frac{1}{D} \sum_{i \in \mathcal{A}} \left(X_i - \mu\right)^{2}
 ```
 ```tex where
-\mathcal{A} = \{\text{axis}, \ldots, r - 1\}, \qquad D = \prod_{k \in \mathcal{A}} d_k
+\mathcal{A} = \{\bar{a}, \ldots, r - 1\}, \quad \bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}, \qquad D = \prod_{k \in \mathcal{A}} d_k
 ```
 sym: \text{axis} = attr:axis ?= -1
 sym: \epsilon = attr:epsilon ?= 10^{-5}
@@ -68,11 +68,15 @@ since: 23
 en: Root mean square normalization over the trailing dimensions starting at axis.
 zh: 均方根归一化，对从 axis 开始的尾部维度计算。
 ```tex
-Y = \frac{X}{\sqrt{\frac{1}{D} \sum_{i \in \mathcal{A}} X_i^{2} + \epsilon}} \odot \text{scale}, \qquad \mathcal{A} = \{\text{axis}, \ldots, r - 1\}
+Y = \frac{X}{\sqrt{\frac{1}{D} \sum_{i \in \mathcal{A}} X_i^{2} + \epsilon}} \odot \text{scale}
+```
+```tex where
+\mathcal{A} = \{\bar{a}, \ldots, r - 1\}, \quad \bar{a} = \begin{cases} \text{axis} + r, & \text{axis} < 0 \\ \text{axis}, & \text{otherwise} \end{cases}, \qquad D = \prod_{k \in \mathcal{A}} d_k
 ```
 sym: \text{axis} = attr:axis ?= -1
 sym: \epsilon = attr:epsilon ?= 10^{-5}
-sym: \operatorname{shape}(X) = in:X.shape
+sym: r = in:X.rank
+sym: (d_0, \ldots) = in:X.shape
 
 ## LpNormalization
 en: Divides by the Lp norm along an axis.
