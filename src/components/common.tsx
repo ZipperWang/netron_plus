@@ -38,6 +38,7 @@ const PATHS = {
   table: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18M9 10v10',
   cube: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12 4 7.5',
   refresh: 'M20 11a8 8 0 1 0-2.4 5.7M20 4.5V11h-6.5',
+  sigma: 'M18 5H6l6 7-6 7h12',
 } as const;
 
 export type IconName = keyof typeof PATHS;

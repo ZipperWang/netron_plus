@@ -7,6 +7,7 @@
 ## 功能
 
 - **结构图**：Canvas 渲染 + Rust 实现的分层布局，上万节点也能流畅缩放；层次细节（LOD）、小地图、面包屑导航子图（If / Loop / Scan / 本地函数）、追踪上下游、按算子/模块/类别高亮、超长连线自动简化、导出 PNG / SVG
+- **算子函数**：选中节点即可查看算子的数学定义（KaTeX 渲染的 TeX 公式、输出形状规则），公式中的符号自动代入本节点的属性、默认值、形状和常量输入；覆盖约 150 个常用标准算子与 ONNX Runtime contrib 算子，可复制 LaTeX；调用模型本地函数的节点可双击进入函数体
 - **形状推断**：覆盖 150+ 常见算子，能解析 `Shape → Gather → Concat → Reshape` 这类导出模式；动态维度（如 `batch`、`seq`）可在概览页填入具体数值，实时重新计算
 - **统计**
   - 参数量、MACs / FLOPs（逐节点、按算子类型、按模块）、激活内存总量与峰值
@@ -53,7 +54,7 @@ Windows 程序在云端的生成路径为 `target/release/netron-plus.exe`。前
 
 ## English
 
-Netron Plus is an ONNX model viewer and analyzer built with Rust and Tauri: architecture graph, operator and tensor tables, shape inference, FLOPs/parameter/memory estimates, weight statistics and model health checks. All analysis runs in Rust (natively in the desktop app, as WebAssembly in the web build).
+Netron Plus is an ONNX model viewer and analyzer built with Rust and Tauri: architecture graph, operator and tensor tables, operator formulas rendered from TeX with the node's attributes and shapes filled in, shape inference, FLOPs/parameter/memory estimates, weight statistics and model health checks. All analysis runs in Rust (natively in the desktop app, as WebAssembly in the web build).
 
 ## License
 

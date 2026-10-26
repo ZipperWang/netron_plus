@@ -18,6 +18,7 @@ import { Sidebar, focusSearch } from './panels/Sidebar';
 import { SummaryView } from './panels/SummaryView';
 import { ChecksView, NodesView, OperatorsView, TensorsView, WeightsView } from './panels/TableViews';
 import { HelpDialog, StatusBar, Toasts, Toolbar, Welcome } from './panels/Chrome';
+import { OpFunctionDialog } from './panels/OpFunction';
 import { Icon, Resizer, Spinner } from './components/common';
 
 function isEditable(el: Element | null): boolean {
@@ -201,6 +202,7 @@ export default function App() {
       </div>
       <StatusBar />
       <HelpDialog />
+      {summary && <OpFunctionDialog />}
       <Toasts />
       <input
         ref={fileRef}

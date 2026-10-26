@@ -161,6 +161,8 @@ export interface ViewNode {
   lines: ViewLine[];
   module: string;
   sub: boolean;
+  /** Model-local function called by an op node. */
+  func?: number;
   /** Nodes inside a collapsed module node. */
   members?: number;
   /** IR node ids represented by a collapsed module node. */
@@ -242,6 +244,12 @@ export interface NodeCost {
   writeBytes: number | null;
 }
 
+export interface SubgraphRef {
+  id: number;
+  label: string;
+  nodes: number;
+}
+
 export interface NodeDetail {
   graph: number;
   id: number;
@@ -257,7 +265,9 @@ export interface NodeDetail {
   outputs: SlotInfo[];
   implicitInputs: ValueBrief[];
   attributes: AttrInfo[];
-  subgraphs: { id: number; label: string; nodes: number }[];
+  subgraphs: SubgraphRef[];
+  /** Body of the model-local function the node calls. */
+  function: SubgraphRef | null;
   cost: NodeCost;
   metadata: KeyValue[];
   module: string;
@@ -437,4 +447,37 @@ export interface SearchHit {
   name: string;
   op: string;
   detail: string;
+}
+
+// Operator function definitions (see crates/core/src/opfunc.rs).
+
+export interface TexBlock {
+  /** "" for the definition, "shape" / "where" for those parts, otherwise a variant such as "mode = DCR". */
+  label: string;
+  tex: string;
+}
+
+export interface FnSymbol {
+  tex: string;
+  /** What the symbol is bound to, e.g. "alpha" or "X.shape[1]". */
+  binding: string;
+  kind: 'attr' | 'input' | 'output';
+  /** TeX for the value. */
+  value: string | null;
+  source: 'set' | 'default' | 'derived' | 'unknown';
+}
+
+export interface OpFunction {
+  op: string;
+  domain: string;
+  opset: number | null;
+  /** First opset of the definition used; null when there is none. */
+  since: number | null;
+  summary: { en: string; zh: string };
+  note: { en: string; zh: string };
+  formulas: TexBlock[];
+  symbols: FnSymbol[];
+  docUrl: string | null;
+  function: SubgraphRef | null;
+  node: number | null;
 }

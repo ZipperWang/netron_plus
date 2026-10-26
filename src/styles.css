@@ -1976,3 +1976,138 @@ kbd {
   width: 22px;
   height: 22px;
 }
+
+/* ------------------------------------------------------ operator function */
+
+.section-actions {
+  display: flex;
+  align-items: center;
+}
+.section-actions .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+.fn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 12px 4px;
+}
+.fn-summary,
+.fn-note,
+.fn-none {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.fn-formula {
+  position: relative;
+  padding: 6px 28px 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+}
+.fn-formula .copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.fn-label {
+  margin-bottom: 2px;
+  font: 11px var(--font-mono);
+  color: var(--text-3);
+}
+.fn-tex,
+.fn-sym-tex {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: var(--text);
+}
+.fn-tex .katex-display {
+  margin: 4px 0;
+}
+.tex-src {
+  font: 11.5px var(--font-mono);
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.tex-error {
+  color: var(--danger);
+}
+.fn-note {
+  display: flex;
+  gap: 6px;
+}
+.fn-note .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.fn-head {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.fn-sym {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+.fn-sym:last-child {
+  border-bottom: 0;
+}
+.fn-sym-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.fn-binding {
+  max-width: 140px;
+  overflow: hidden;
+  font: 11px var(--font-mono);
+  color: var(--text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fn-body-link {
+  padding: 3px 0;
+}
+.fn-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fn-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fn-title .icon {
+  color: var(--accent);
+}
+.modal-wide {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+}
+.modal-body {
+  min-height: 0;
+  margin: 0 -6px;
+  overflow: auto;
+}
+.modal-wide .fn {
+  padding: 2px 6px 4px;
+}
+.modal-wide .fn-tex .katex-display > .katex {
+  font-size: 1.15em;
+}
+.modal-wide .fn-binding {
+  max-width: 280px;
+}

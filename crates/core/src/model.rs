@@ -407,6 +407,8 @@ pub struct Model {
     pub opsets: Vec<(String, i64)>,
     pub metadata: Vec<(String, String)>,
     pub graphs: Vec<Graph>,
+    /// Model-local functions by `(domain, name)`; the standard domain is "".
+    pub functions: HashMap<(String, String), GraphId>,
     pub file_name: String,
     pub file_path: Option<String>,
     pub file_size: u64,
@@ -426,6 +428,24 @@ impl Model {
     pub fn opset(&self, domain: &str) -> Option<i64> {
         self.graphs.first().and_then(|g| g.opset(domain))
     }
+
+    /// The model-local function with this domain and name, if any.
+    pub fn function(&self, domain: &str, name: &str) -> Option<GraphId> {
+        if self.functions.is_empty() {
+            return None;
+        }
+        self.functions.get(&function_key(domain, name)).copied()
+    }
+
+    /// The model-local function a node calls, if any.
+    pub fn function_of(&self, node: &Node) -> Option<GraphId> {
+        self.function(&node.domain, &node.op_type)
+    }
+}
+
+fn function_key(domain: &str, name: &str) -> (String, String) {
+    let d = if crate::ops::is_standard_domain(domain) { "" } else { domain };
+    (d.to_string(), name.to_string())
 }
 
 /// Decode an ONNX file and build the model representation.
@@ -496,6 +516,13 @@ pub fn load(bytes: Vec<u8>, file_name: String, file_path: Option<String>) -> Res
         }
     }
 
+    let mut functions = HashMap::new();
+    for (gid, g) in b.graphs.iter().enumerate() {
+        if let GraphOwner::Function { domain, name, .. } = &g.owner {
+            functions.entry(function_key(domain, name)).or_insert(gid);
+        }
+    }
+
     Ok(Model {
         ir_version: mp.ir_version,
         producer_name: mp.producer_name,
@@ -506,6 +533,7 @@ pub fn load(bytes: Vec<u8>, file_name: String, file_path: Option<String>) -> Res
         opsets,
         metadata: kv(mp.metadata_props),
         graphs: b.graphs,
+        functions,
         file_name,
         file_path,
         file_size,

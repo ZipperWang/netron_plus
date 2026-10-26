@@ -654,8 +654,8 @@ export class GraphRenderer {
       c.stroke();
       c.setLineDash([]);
     }
-    if (n.sub) {
-      // A small "stacked" marker on control-flow nodes that own subgraphs.
+    if (n.sub || n.func !== undefined) {
+      // A small marker on nodes that open a subgraph or a local function body.
       c.fillStyle = 'rgba(255,255,255,0.85)';
       c.beginPath();
       const mx = n.x + n.w - 9;

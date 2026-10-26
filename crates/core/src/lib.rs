@@ -11,11 +11,13 @@ pub mod format;
 pub mod infer;
 pub mod layout;
 pub mod model;
+pub mod opfunc;
 pub mod ops;
 pub mod proto;
 pub mod shape;
 pub mod summary;
 pub mod tensor;
+pub mod tex;
 pub mod view;
 
 pub use api::Workspace;

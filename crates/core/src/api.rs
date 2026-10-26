@@ -10,6 +10,7 @@ use crate::dtype;
 use crate::format;
 use crate::infer::{Overrides, ShapeSource};
 use crate::model::{self, AttrValue, GraphId, Model, TypeInfo, IMPLICIT_SLOT};
+use crate::opfunc;
 use crate::ops;
 use crate::shape::{self, Dim};
 use crate::summary::{self, KeyValue};
@@ -112,6 +113,21 @@ struct OverridesReq {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct OpFunctionReq {
+    model: u32,
+    #[serde(default)]
+    graph: usize,
+    /// Bind the definition to this node; otherwise describe `domain::op`.
+    #[serde(default)]
+    node: Option<usize>,
+    #[serde(default)]
+    op: Option<String>,
+    #[serde(default)]
+    domain: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SearchReq {
     model: u32,
     query: String,
@@ -192,6 +208,8 @@ pub struct NodeDetail {
     pub implicit_inputs: Vec<ValueBrief>,
     pub attributes: Vec<AttrInfo>,
     pub subgraphs: Vec<SubgraphRef>,
+    /// Body of the model-local function the node calls.
+    pub function: Option<SubgraphRef>,
     pub cost: NodeCost,
     pub metadata: Vec<KeyValue>,
     pub module: String,
@@ -454,6 +472,15 @@ impl Workspace {
                 let issues = checks::run(&d.model, &an, d.source.as_ref(), false);
                 to_json(&summary::build(d.id, &d.model, &an, &issues))
             }
+            "opFunction" => {
+                let r: OpFunctionReq = parse(params)?;
+                let d = self.doc(r.model)?;
+                match (r.node, r.op) {
+                    (Some(n), _) => to_json(&opfunc::describe_node(&d.model, &d.analysis(), r.graph, n)?),
+                    (None, Some(op)) => to_json(&opfunc::describe_op(&d.model, &r.domain, &op)),
+                    (None, None) => bail!("opFunction needs a node or an op"),
+                }
+            }
             "search" => {
                 let r: SearchReq = parse(params)?;
                 let d = self.doc(r.model)?;
@@ -567,6 +594,11 @@ impl Workspace {
                 .collect(),
             attributes,
             subgraphs,
+            function: model.function_of(n).map(|f| SubgraphRef {
+                id: f,
+                label: model.graphs[f].label(&model.graphs),
+                nodes: model.graphs[f].nodes.len(),
+            }),
             cost: an.costs[gid][ni].clone(),
             metadata: summary::kvs(&n.metadata),
             module: model::module_path(&n.name),

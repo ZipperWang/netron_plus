@@ -285,6 +285,153 @@ fn full_api_roundtrip() {
     assert!(weights.as_array().unwrap().len() >= 5);
 }
 
+fn open(ws: &Workspace, bytes: Vec<u8>) -> (u64, Value) {
+    let summary: Value = serde_json::from_str(
+        &ws.open_bytes("test.onnx".into(), None, bytes, Box::new(NoSource))
+            .expect("open"),
+    )
+    .unwrap();
+    (summary["id"].as_u64().unwrap(), summary)
+}
+
+fn symbol(f: &Value, tex: &str) -> Value {
+    f["symbols"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["tex"] == tex)
+        .cloned()
+        .unwrap_or_else(|| panic!("symbol {} not found in {}", tex, f))
+}
+
+#[test]
+fn op_functions() {
+    let ws = Workspace::new();
+    let (id, _) = open(&ws, build_model());
+
+    // Conv: attributes from the model, defaults, and values derived from shapes.
+    let conv = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 0}));
+    assert_eq!(conv["op"], "Conv");
+    assert_eq!(conv["node"], 0);
+    assert!(conv["since"].as_i64().is_some());
+    let formulas = conv["formulas"].as_array().unwrap();
+    assert!(formulas.iter().any(|f| f["label"] == ""));
+    assert!(formulas.iter().any(|f| f["label"] == "shape"));
+    let k = symbol(&conv, r"\mathbf{K}");
+    assert_eq!(k["value"], r"(3,\, 3)");
+    assert_eq!(k["source"], "set");
+    assert_eq!(k["kind"], "attr");
+    assert_eq!(symbol(&conv, r"\mathbf{s}")["source"], "default");
+    let c = symbol(&conv, "C");
+    assert_eq!(c["value"], "3");
+    assert_eq!(c["source"], "derived");
+    assert_eq!(c["binding"], "X.shape[1]");
+    assert_eq!(symbol(&conv, "M")["value"], "8");
+    assert_eq!(
+        symbol(&conv, r"\operatorname{shape}(X)")["value"],
+        r"(\textit{N},\, 3,\, 32,\, 32)"
+    );
+
+    // Constant inputs and shape arithmetic provide input values.
+    let gather = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 4}));
+    assert_eq!(symbol(&gather, r"\text{indices}")["value"], "0");
+    let reshape = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 7}));
+    assert_eq!(symbol(&reshape, r"\text{shape}")["value"], r"(\textit{N},\, -1)");
+
+    // The entry matching the opset is used (Softmax changed in opset 13).
+    let softmax = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 9}));
+    assert_eq!(softmax["since"], 13);
+    assert_eq!(symbol(&softmax, r"\text{axis}")["value"], "1");
+    assert_eq!(symbol(&softmax, r"\text{axis}")["source"], "set");
+    let gemm = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 8}));
+    assert_eq!(symbol(&gemm, r"\text{transB}")["value"], "1");
+    assert_eq!(symbol(&gemm, r"\alpha")["source"], "default");
+    assert_eq!(symbol(&gemm, r"\alpha")["value"], "1");
+
+    // Generic definitions by operator type; unknown operators have none.
+    let relu = call(&ws, "opFunction", json!({"model": id, "op": "Relu"}));
+    assert!(relu["node"].is_null());
+    assert!(relu["docUrl"].as_str().unwrap().contains("onnx__Relu"));
+    assert!(!relu["summary"]["zh"].as_str().unwrap().is_empty());
+    let custom = call(&ws, "opFunction", json!({"model": id, "op": "Foo", "domain": "my.domain"}));
+    assert!(custom["since"].is_null());
+    assert!(custom["formulas"].as_array().unwrap().is_empty());
+    assert!(ws.call("opFunction", &json!({"model": id})).is_err());
+}
+
+#[test]
+fn local_functions_link_to_call_sites() {
+    let swish = FunctionProto {
+        name: "Swish".into(),
+        domain: "local".into(),
+        input: vec!["X".into()],
+        output: vec!["Y".into()],
+        node: vec![
+            node("Sigmoid", "", &["X"], &["S"], vec![]),
+            node("Mul", "", &["X", "S"], &["Y"], vec![]),
+        ],
+        opset_import: vec![OperatorSetIdProto {
+            domain: String::new(),
+            version: 18,
+        }],
+        ..Default::default()
+    };
+    let mut caller = node("Swish", "swish", &["x"], &["y"], vec![]);
+    caller.domain = "local".into();
+    let graph = GraphProto {
+        name: "g".into(),
+        node: vec![caller, node("Relu", "relu", &["y"], &["z"], vec![])],
+        input: vec![vi("x", tensor_type(1, vec![dim(1), dim(4)]))],
+        output: vec![vi("z", tensor_type(1, vec![dim(1), dim(4)]))],
+        ..Default::default()
+    };
+    let model = ModelProto {
+        ir_version: 8,
+        opset_import: vec![
+            OperatorSetIdProto {
+                domain: String::new(),
+                version: 18,
+            },
+            OperatorSetIdProto {
+                domain: "local".into(),
+                version: 1,
+            },
+        ],
+        graph: Some(graph),
+        functions: vec![swish],
+        ..Default::default()
+    };
+    let ws = Workspace::new();
+    let (id, summary) = open(&ws, model.encode_to_vec());
+    let fg = summary["graphs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|g| g["kind"] == "function")
+        .expect("function graph")["id"]
+        .as_u64()
+        .unwrap();
+
+    let detail = call(&ws, "node", json!({"model": id, "graph": 0, "node": 0}));
+    assert_eq!(detail["function"]["id"], fg);
+    assert_eq!(detail["function"]["nodes"], 2);
+    let relu = call(&ws, "node", json!({"model": id, "graph": 0, "node": 1}));
+    assert!(relu["function"].is_null());
+
+    let view = call(&ws, "graph", json!({"model": id, "graph": 0}));
+    let vnodes = view["nodes"].as_array().unwrap();
+    let swish_box = vnodes.iter().find(|n| n["title"] == "local::Swish").unwrap();
+    assert_eq!(swish_box["func"], fg);
+    let relu_box = vnodes.iter().find(|n| n["title"] == "Relu").unwrap();
+    assert!(relu_box.get("func").is_none());
+
+    let f = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": 0}));
+    assert_eq!(f["function"]["id"], fg);
+    assert!(f["since"].is_null());
+    let by_type = call(&ws, "opFunction", json!({"model": id, "op": "Swish", "domain": "local"}));
+    assert_eq!(by_type["function"]["id"], fg);
+}
+
 #[test]
 fn rejects_garbage() {
     let ws = Workspace::new();
