@@ -364,9 +364,10 @@ pub fn all() -> impl Iterator<Item = &'static OpDef> {
 }
 
 /// The entry describing `opset`, or the newest one when the opset is unknown.
+/// An opset older than every entry gets none: later semantics would be wrong.
 fn pick(list: &[OpDef], opset: Option<i64>) -> Option<&OpDef> {
     match opset {
-        Some(v) => list.iter().rev().find(|d| d.since <= v).or(list.first()),
+        Some(v) => list.iter().rev().find(|d| d.since <= v),
         None => list.last(),
     }
 }
@@ -464,7 +465,7 @@ fn unbound(s: &SymbolDef) -> SymbolValue {
 pub fn describe_op(model: &Model, domain: &str, op: &str) -> OpFunction {
     let opset = model.opset(domain);
     let mut out = build(definition(domain, op, opset), domain, op, opset, unbound);
-    out.function = model.function(domain, op).map(|f| function_ref(model, f));
+    out.function = model.function(domain, op, "").map(|f| function_ref(model, f));
     out
 }
 
@@ -545,8 +546,9 @@ fn attr_tex(model: &Model, g: &Graph, v: &AttrValue) -> Option<String> {
 /// Result of evaluating one symbol source against a node.
 enum Eval {
     Found(String, &'static str),
-    /// The attribute or slot is there but its value is not known.
-    Unknown,
+    /// The attribute or slot is there but its value is not known; the
+    /// optional text replaces the binding label.
+    Unknown(Option<String>),
     /// The attribute or slot is absent.
     Absent,
 }
@@ -578,7 +580,7 @@ fn slot_tex(st: &VState, prop: &Prop) -> Option<String> {
 
 impl Binder<'_> {
     fn symbol(&self, s: &SymbolDef) -> SymbolValue {
-        let mut unknown: Option<&Source> = None;
+        let mut unknown: Option<(&Source, Option<String>)> = None;
         for src in &s.sources {
             match self.eval(src) {
                 Eval::Found(value, source) => {
@@ -590,17 +592,17 @@ impl Binder<'_> {
                         source,
                     }
                 }
-                Eval::Unknown => {
-                    unknown.get_or_insert(src);
+                Eval::Unknown(label) => {
+                    unknown.get_or_insert((src, label));
                 }
                 Eval::Absent => {}
             }
         }
         match unknown {
             // Present in the model but not computable: the default would be wrong.
-            Some(src) => SymbolValue {
+            Some((src, label)) => SymbolValue {
                 tex: s.tex.clone(),
-                binding: src.label(),
+                binding: label.unwrap_or_else(|| src.label()),
                 kind: src.kind(),
                 value: None,
                 source: "unknown",
@@ -631,21 +633,27 @@ impl Binder<'_> {
     fn eval(&self, src: &Source) -> Eval {
         let found = |v: Option<String>, source: &'static str| match v {
             Some(v) => Eval::Found(v, source),
-            None => Eval::Unknown,
+            None => Eval::Unknown(None),
         };
         match src {
-            Source::Attr(name) => match self.node.attr(name) {
-                Some(v) => found(attr_tex(self.model, self.g, v), "set"),
-                None => Eval::Absent,
-            },
-            Source::AttrDtype(name) => match self.node.attr(name) {
-                Some(AttrValue::Int(v)) => {
-                    let n = dtype::name(*v as i32);
-                    found((!n.is_empty()).then(|| tex::texttt(n)), "set")
+            Source::Attr(name) | Source::AttrDtype(name) => {
+                let Some(a) = self.node.attributes.iter().find(|a| a.name == *name) else {
+                    return Eval::Absent;
+                };
+                // Inside a function body the attribute may only reference a
+                // parameter of the function; its own value field is empty.
+                if !a.ref_attr_name.is_empty() {
+                    return Eval::Unknown(Some(format!("{} = @{}", name, a.ref_attr_name)));
                 }
-                Some(_) => Eval::Unknown,
-                None => Eval::Absent,
-            },
+                match (src, &a.value) {
+                    (Source::AttrDtype(_), AttrValue::Int(v)) => {
+                        let n = dtype::name(*v as i32);
+                        found((!n.is_empty()).then(|| tex::texttt(n)), "set")
+                    }
+                    (Source::AttrDtype(_), _) => Eval::Unknown(None),
+                    (_, v) => found(attr_tex(self.model, self.g, v), "set"),
+                }
+            }
             Source::Slot { side, slot, prop } => {
                 match self.slot_value(*side, slot).and_then(|v| self.states.get(v)) {
                     Some(st) => found(slot_tex(st, prop), "derived"),
@@ -732,8 +740,13 @@ mod tests {
         assert_eq!(definition("", "Softmax", Some(11)).unwrap().since, 1);
         assert_eq!(definition("", "Softmax", Some(13)).unwrap().since, 13);
         assert_eq!(definition("", "Softmax", None).unwrap().since, 13);
-        assert_eq!(definition("ai.onnx", "Clip", Some(9)).unwrap().since, 6);
+        assert_eq!(definition("ai.onnx", "Clip", Some(9)).unwrap().since, 1);
         assert_eq!(definition("", "Clip", Some(17)).unwrap().since, 11);
+        assert_eq!(definition("", "LogSoftmax", Some(11)).unwrap().since, 1);
+        assert_eq!(definition("", "Resize", Some(10)).unwrap().since, 10);
+        // Never semantics from a later opset.
+        assert!(definition("", "Gelu", Some(17)).is_none());
+        assert!(definition("", "LayerNormalization", Some(13)).is_none());
         // Contrib ops fall back to the standard definition.
         assert_eq!(definition("com.microsoft", "Relu", Some(1)).unwrap().op, "Relu");
         assert!(definition("my.domain", "Relu", None).is_none());

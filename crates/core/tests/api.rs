@@ -376,11 +376,51 @@ fn local_functions_link_to_call_sites() {
         }],
         ..Default::default()
     };
+    // An overload of the same function whose body references an attribute.
+    let leaky = FunctionProto {
+        name: "Swish".into(),
+        domain: "local".into(),
+        overload: "leaky".into(),
+        input: vec!["X".into()],
+        output: vec!["Y".into()],
+        attribute: vec!["a".into()],
+        node: vec![node(
+            "LeakyRelu",
+            "",
+            &["X"],
+            &["Y"],
+            vec![AttributeProto {
+                name: "alpha".into(),
+                r#type: 1,
+                ref_attr_name: "a".into(),
+                ..Default::default()
+            }],
+        )],
+        opset_import: vec![OperatorSetIdProto {
+            domain: String::new(),
+            version: 18,
+        }],
+        ..Default::default()
+    };
     let mut caller = node("Swish", "swish", &["x"], &["y"], vec![]);
     caller.domain = "local".into();
+    let mut caller2 = node(
+        "Swish",
+        "swish_leaky",
+        &["y"],
+        &["y2"],
+        vec![AttributeProto {
+            name: "a".into(),
+            r#type: 1,
+            f: 0.2,
+            ..Default::default()
+        }],
+    );
+    caller2.domain = "local".into();
+    caller2.overload = "leaky".into();
     let graph = GraphProto {
         name: "g".into(),
-        node: vec![caller, node("Relu", "relu", &["y"], &["z"], vec![])],
+        node: vec![caller, caller2, node("Relu", "relu", &["y2"], &["z"], vec![])],
         input: vec![vi("x", tensor_type(1, vec![dim(1), dim(4)]))],
         output: vec![vi("z", tensor_type(1, vec![dim(1), dim(4)]))],
         ..Default::default()
@@ -398,30 +438,41 @@ fn local_functions_link_to_call_sites() {
             },
         ],
         graph: Some(graph),
-        functions: vec![swish],
+        functions: vec![swish, leaky],
         ..Default::default()
     };
     let ws = Workspace::new();
     let (id, summary) = open(&ws, model.encode_to_vec());
-    let fg = summary["graphs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|g| g["kind"] == "function")
-        .expect("function graph")["id"]
-        .as_u64()
-        .unwrap();
+    let graph_id = |label: &str| {
+        summary["graphs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["label"] == label)
+            .unwrap_or_else(|| panic!("graph {} not found", label))["id"]
+            .as_u64()
+            .unwrap()
+    };
+    let fg = graph_id("function local::Swish");
+    let fg2 = graph_id("function local::Swish:leaky");
+    assert_ne!(fg, fg2);
 
+    // Calls resolve by (domain, name, overload).
     let detail = call(&ws, "node", json!({"model": id, "graph": 0, "node": 0}));
     assert_eq!(detail["function"]["id"], fg);
     assert_eq!(detail["function"]["nodes"], 2);
-    let relu = call(&ws, "node", json!({"model": id, "graph": 0, "node": 1}));
+    let detail2 = call(&ws, "node", json!({"model": id, "graph": 0, "node": 1}));
+    assert_eq!(detail2["function"]["id"], fg2);
+    assert_eq!(detail2["function"]["nodes"], 1);
+    let relu = call(&ws, "node", json!({"model": id, "graph": 0, "node": 2}));
     assert!(relu["function"].is_null());
 
     let view = call(&ws, "graph", json!({"model": id, "graph": 0}));
     let vnodes = view["nodes"].as_array().unwrap();
-    let swish_box = vnodes.iter().find(|n| n["title"] == "local::Swish").unwrap();
+    let swish_box = vnodes.iter().find(|n| n["node"] == 0).unwrap();
     assert_eq!(swish_box["func"], fg);
+    let leaky_box = vnodes.iter().find(|n| n["node"] == 1).unwrap();
+    assert_eq!(leaky_box["func"], fg2);
     let relu_box = vnodes.iter().find(|n| n["title"] == "Relu").unwrap();
     assert!(relu_box.get("func").is_none());
 
@@ -430,6 +481,14 @@ fn local_functions_link_to_call_sites() {
     assert!(f["since"].is_null());
     let by_type = call(&ws, "opFunction", json!({"model": id, "op": "Swish", "domain": "local"}));
     assert_eq!(by_type["function"]["id"], fg);
+
+    // An attribute referencing a function parameter has no value of its own.
+    let inner = call(&ws, "opFunction", json!({"model": id, "graph": fg2, "node": 0}));
+    assert_eq!(inner["op"], "LeakyRelu");
+    let alpha = symbol(&inner, r"\alpha");
+    assert_eq!(alpha["source"], "unknown");
+    assert!(alpha["value"].is_null());
+    assert_eq!(alpha["binding"], "alpha = @a");
 }
 
 #[test]

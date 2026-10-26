@@ -169,6 +169,20 @@ sym: \mathbf{I} = in:data.shape
 sym: \mathbf{O} = out:output.shape
 
 ## Resize
+since: 10
+en: Resizes by scale factors with nearest or linear interpolation (asymmetric coordinates).
+zh: 按比例缩放，使用最近邻或线性插值（asymmetric 坐标变换）。
+note.en: Opset 11 added sizes, roi, cubic mode and the coordinate transformation modes.
+note.zh: opset 11 起新增 sizes、roi、cubic 模式和多种坐标变换方式。
+```tex
+Y_{\mathbf{x}} = \operatorname{interp}_{\text{mode}}\left(X,\, \frac{\mathbf{x}}{\text{scales}}\right), \qquad O_i = \floor{I_i \cdot \text{scales}_i}
+```
+sym: \text{mode} = attr:mode ?= \texttt{nearest}
+sym: \text{scales} = in:1.value
+sym: \mathbf{I} = in:X.shape
+sym: \mathbf{O} = out:Y.shape
+
+## Resize
 since: 11
 en: Resizes with nearest, linear or cubic interpolation.
 zh: 使用最近邻、线性或三次插值缩放。

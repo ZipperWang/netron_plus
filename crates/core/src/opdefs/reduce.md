@@ -124,7 +124,7 @@ zh: 沿指定轴取最大（或最小）的 K 个元素及其索引。
 ```tex
 (\text{Values}, \text{Indices}) = \operatorname{topk}_{K}\left(X,\, \text{axis}\right), \qquad \operatorname{shape}(\text{Values})_{\text{axis}} = K
 ```
-sym: K = in:K.value
+sym: K = in:K.value, attr:k
 sym: \text{axis} = attr:axis ?= -1
 sym: \text{largest} = attr:largest ?= 1
 sym: \text{sorted} = attr:sorted ?= 1

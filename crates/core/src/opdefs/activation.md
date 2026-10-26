@@ -139,7 +139,7 @@ sym: \lambda = attr:lambd ?= 0.5
 sym: b = attr:bias ?= 0
 
 ## Clip
-since: 6
+since: 1
 en: Limits values to [min, max]; bounds are attributes before opset 11.
 zh: 将数值限制在 [min, max]；opset 11 之前上下界为属性。
 ```tex
@@ -183,6 +183,18 @@ sym: \text{axis} = attr:axis ?= -1
 sym: (d_0, \ldots) = in:input.shape
 
 ## LogSoftmax
+since: 1
+en: Log-softmax over the input coerced to 2-D at axis (opset < 13).
+zh: 先在 axis 处把输入压成二维，再按行计算 log-softmax（opset < 13）。
+note.en: Opset 13 changed the semantics to a single axis.
+note.zh: opset 13 起语义改为沿单个轴计算。
+```tex
+Y_{n,i} = X_{n,i} - \ln \sum_{j=0}^{D-1} e^{X_{n,j}}, \qquad N = \prod_{k < \text{axis}} d_k,\quad D = \prod_{k \ge \text{axis}} d_k
+```
+sym: \text{axis} = attr:axis ?= 1
+sym: (d_0, \ldots) = in:input.shape
+
+## LogSoftmax
 since: 13
 en: Logarithm of the softmax along one axis.
 zh: 沿指定轴计算 softmax 的对数。
@@ -190,6 +202,16 @@ zh: 沿指定轴计算 softmax 的对数。
 Y_{\ldots, i, \ldots} = X_{\ldots, i, \ldots} - \ln \sum_{j} e^{X_{\ldots, j, \ldots}}
 ```
 sym: \text{axis} = attr:axis ?= -1
+
+## Hardmax
+since: 1
+en: One-hot of the first maximum of each row, with the input coerced to 2-D at axis (opset < 13).
+zh: 先在 axis 处把输入压成二维，每行第一个最大值位置为 1、其余为 0（opset < 13）。
+```tex
+Y_{n,i} = \begin{cases} 1, & i = \argmax_{j} X_{n,j} \\ 0, & \text{otherwise} \end{cases}, \qquad N = \prod_{k < \text{axis}} d_k,\quad D = \prod_{k \ge \text{axis}} d_k
+```
+sym: \text{axis} = attr:axis ?= 1
+sym: (d_0, \ldots) = in:input.shape
 
 ## Hardmax
 since: 13
