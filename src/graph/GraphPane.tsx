@@ -8,10 +8,12 @@ import {
   expandModule,
   highlightNodes,
   inModule,
+  openFunction,
   select,
   setGraph,
   setTrace,
   setViewOpts,
+  showOpFunction,
   stepHighlight,
   useStore,
   useT,
@@ -59,6 +61,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
   const theme = useStore((s) => s.theme);
   const collapsed = useStore((s) => s.collapsed);
   const hierarchy = useStore((s) => s.hierarchy);
+  const callers = useStore((s) => s.callers);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -465,6 +468,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
       if (n.kind === 'op') {
         if (n.name && !viewOpts.showNames) lines.push(n.name);
         if (n.sub) lines.push(t('graph.dblclickSub'));
+        else if (n.func !== undefined) lines.push(t('graph.dblclickFunction'));
       } else if (n.kind === 'module') {
         title = n.module;
         lines.push(`${t('insp.members')}: ${n.members ?? 0}`);
@@ -552,6 +556,7 @@ export function GraphPane({ visible }: { visible: boolean }) {
     }
     const subs = n.kind === 'op' && n.sub ? subgraphsOf(n) : [];
     if (subs.length) setGraph(subs[0]);
+    else if (n.kind === 'op' && n.func !== undefined) openFunction(v.graph, n.func);
     else r.focusNode(i);
   };
 
@@ -568,6 +573,15 @@ export function GraphPane({ visible }: { visible: boolean }) {
       const n = v.nodes[i];
       items.push({ label: t('graph.focus'), icon: 'target', onClick: () => r.focusNode(i) });
       if (n.kind === 'op') {
+        items.push({
+          label: t('graph.viewFunction'),
+          icon: 'sigma',
+          onClick: () => showOpFunction({ graph: v.graph, node: n.node }),
+        });
+        if (n.func !== undefined) {
+          const fn = n.func;
+          items.push({ label: t('graph.openFunction'), icon: 'layers', onClick: () => openFunction(v.graph, fn) });
+        }
         items.push(
           { separator: true },
           { label: t('graph.traceUp'), icon: 'arrowUp', onClick: () => setTrace('up') },
@@ -664,11 +678,13 @@ export function GraphPane({ visible }: { visible: boolean }) {
     let guard = 0;
     while (g && guard++ < 64) {
       out.unshift({ id: g.id, label: g.kind === 'main' ? summary.fileName : g.label });
-      if (g.parent === null) break;
-      g = summary.graphs[g.parent];
+      // Local functions have no parent; continue from the graph that opened them.
+      const up = g.parent ?? (g.kind === 'function' ? callers[g.id] : undefined);
+      if (up === undefined) break;
+      g = summary.graphs[up];
     }
     return out;
-  }, [summary, graphId]);
+  }, [summary, graphId, callers]);
 
   const moduleLevels = hierarchy && view && hierarchy.graph === view.graph ? Math.min(3, treeDepth(hierarchy.root)) : 0;
   const moduleItems = (): MenuItem[] => {

@@ -55,6 +55,14 @@ jobs:
         run: cargo test -p netron-core --release -- --nocapture
         env:
           NETRON_SAMPLES: ${{ github.workspace }}/samples
+          NETRON_TEX_DUMP: ${{ github.workspace }}/target/tex-dump.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Render operator formulas with KaTeX
+        run: |
+          npm install --no-audit --no-fund
+          node scripts/check_tex.mjs target/tex-dump.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

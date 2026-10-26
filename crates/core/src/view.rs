@@ -121,6 +121,9 @@ pub struct ViewNode {
     pub lines: Vec<ViewLine>,
     pub module: String,
     pub sub: bool,
+    /// Model-local function called by an op node.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub func: Option<GraphId>,
     /// Number of nodes inside a collapsed module node.
     #[serde(skip_serializing_if = "is_zero")]
     pub members: usize,
@@ -313,6 +316,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            func: None,
             members: 0,
             ids: Vec::new(),
             x: 0.0,
@@ -393,6 +397,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
                 lines,
                 module: path.to_string(),
                 sub: false,
+                func: None,
                 members,
                 ids: (0..g.nodes.len()).filter(|&nj| group_of[nj] == Some(gi)).collect(),
                 x: 0.0,
@@ -454,6 +459,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: modules[ni].clone(),
             sub: !node.subgraphs.is_empty(),
+            func: model.function_of(node),
             members: 0,
             ids: Vec::new(),
             x: 0.0,
@@ -508,6 +514,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            func: None,
             members: 0,
             ids: Vec::new(),
             x: 0.0,
@@ -574,6 +581,7 @@ pub fn build_view(model: &Model, an: &Analysis, gid: GraphId, opt: &ViewOptions)
             lines,
             module: String::new(),
             sub: false,
+            func: None,
             members: 0,
             ids: Vec::new(),
             x: 0.0,

@@ -54,6 +54,9 @@ export interface Toast {
   text: string;
 }
 
+/** A node, or an operator type, whose function definition is shown. */
+export type OpFunctionTarget = { graph: number; node: number } | { op: string; domain: string };
+
 export interface FocusRequest {
   seq: number;
   graph: number;
@@ -92,6 +95,10 @@ interface State {
   nodeFilter: string;
   /** Module paths collapsed into single nodes in the current graph. */
   collapsed: string[];
+  /** Operator function shown in the dialog. */
+  opFunction: OpFunctionTarget | null;
+  /** Local function graph → the graph it was opened from (for the breadcrumb). */
+  callers: Record<number, number>;
   showHelp: boolean;
   dropping: boolean;
 }
@@ -200,6 +207,8 @@ export const useStore = create<State>()(() => ({
   hierarchy: null,
   nodeFilter: '',
   collapsed: [],
+  opFunction: null,
+  callers: {},
   showHelp: false,
   dropping: false,
 }));
@@ -325,6 +334,8 @@ function resetForModel(summary: ModelSummary) {
     hierarchy: null,
     nodeFilter: '',
     collapsed: [],
+    opFunction: null,
+    callers: {},
     tab: 'graph',
     focus: null,
   });
@@ -396,6 +407,8 @@ export async function closeModel() {
     issues: null,
     hierarchy: null,
     collapsed: [],
+    opFunction: null,
+    callers: {},
   });
   document.title = 'Netron Plus';
 }
@@ -528,6 +541,21 @@ export function showValue(graph: number, id: number) {
   set({ selection: { kind: 'value', graph, id }, tab: 'graph' });
   if (graph !== get().graphId) setGraph(graph, true);
   requestFocus(graph, 'value', [id]);
+}
+
+/** Open the body of a model-local function, remembering where it was called from. */
+export function openFunction(from: number, fn: number) {
+  if (from !== fn) set({ callers: { ...get().callers, [fn]: from } });
+  set({ opFunction: null, tab: 'graph' });
+  setGraph(fn);
+}
+
+export function showOpFunction(target: OpFunctionTarget) {
+  set({ opFunction: target });
+}
+
+export function closeOpFunction() {
+  set({ opFunction: null });
 }
 
 export function highlightNodes(label: string, graph: number, nodes: number[], jump = true) {

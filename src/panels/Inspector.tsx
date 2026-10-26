@@ -8,10 +8,12 @@ import {
   highlightNodes,
   inModule,
   openExternal,
+  openFunction,
   select,
   setGraph,
   showModule,
   showNode,
+  showOpFunction,
   showValue,
   copyText,
   useStore,
@@ -23,6 +25,7 @@ import { HistogramChart } from '../components/Charts';
 import { categoryColor } from '../graph/colors';
 import { fmtBytes, fmtCount, fmtInt, fmtNum, multiIndex, safeFileName, shapeLabel, typeLabel } from '../util/format';
 import type { MsgKey } from '../i18n';
+import { OpFunctionView } from './OpFunction';
 
 function useDetail<T>(method: string, params: Record<string, number>, deps: unknown[]): { data: T | null; error: string | null } {
   const [data, setData] = useState<T | null>(null);
@@ -142,6 +145,10 @@ function NodeInspector({ graph, id }: { graph: number; id: number }) {
         </div>
         <div className="insp-actions">
           <IconButton icon="target" title={t('common.showInGraph')} onClick={() => showNode(graph, id)} />
+          {d.function && (
+            <IconButton icon="layers" title={t('insp.openFunction')} onClick={() => openFunction(graph, d.function!.id)} />
+          )}
+          <IconButton icon="sigma" title={t('insp.viewFunction')} onClick={() => showOpFunction({ graph, node: id })} />
           {d.docUrl && <IconButton icon="external" title={t('insp.docs')} onClick={() => void openExternal(d.docUrl!)} />}
         </div>
       </div>
@@ -199,6 +206,12 @@ function NodeInspector({ graph, id }: { graph: number; id: number }) {
           </div>
         </Section>
       )}
+      <Section
+        title={t('insp.function')}
+        actions={<IconButton icon="fit" size={13} title={t('fn.enlarge')} onClick={() => showOpFunction({ graph, node: id })} />}
+      >
+        <OpFunctionView target={{ graph, node: id }} />
+      </Section>
       {d.subgraphs.length > 0 && (
         <Section title={t('insp.subgraphs')} count={d.subgraphs.length}>
           {d.subgraphs.map((s) => (

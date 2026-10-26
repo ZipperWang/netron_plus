@@ -159,6 +159,8 @@ pub struct Node {
     pub name: String,
     pub op_type: String,
     pub domain: String,
+    /// Overload of the model-local function the node calls (IR 10+).
+    pub overload: String,
     pub inputs: Vec<Option<ValueId>>,
     pub outputs: Vec<Option<ValueId>>,
     pub attributes: Vec<Attribute>,
@@ -241,6 +243,7 @@ pub enum GraphOwner {
         index: usize,
         domain: String,
         name: String,
+        overload: String,
     },
     #[serde(rename_all = "camelCase")]
     Training { index: usize, role: String },
@@ -384,7 +387,17 @@ impl Graph {
                 };
                 format!("{}.{}", nname, attribute)
             }
-            GraphOwner::Function { domain, name, .. } => {
+            GraphOwner::Function {
+                domain,
+                name,
+                overload,
+                ..
+            } => {
+                let name = if overload.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{}:{}", name, overload)
+                };
                 if domain.is_empty() {
                     format!("function {}", name)
                 } else {
@@ -407,6 +420,9 @@ pub struct Model {
     pub opsets: Vec<(String, i64)>,
     pub metadata: Vec<(String, String)>,
     pub graphs: Vec<Graph>,
+    /// Model-local functions by `(domain, name, overload)`; the standard
+    /// domain is "".
+    pub functions: HashMap<(String, String, String), GraphId>,
     pub file_name: String,
     pub file_path: Option<String>,
     pub file_size: u64,
@@ -426,6 +442,26 @@ impl Model {
     pub fn opset(&self, domain: &str) -> Option<i64> {
         self.graphs.first().and_then(|g| g.opset(domain))
     }
+
+    /// The model-local function with this domain, name and overload, if any.
+    pub fn function(&self, domain: &str, name: &str, overload: &str) -> Option<GraphId> {
+        if self.functions.is_empty() {
+            return None;
+        }
+        self.functions
+            .get(&function_key(domain, name, overload))
+            .copied()
+    }
+
+    /// The model-local function a node calls, if any.
+    pub fn function_of(&self, node: &Node) -> Option<GraphId> {
+        self.function(&node.domain, &node.op_type, &node.overload)
+    }
+}
+
+fn function_key(domain: &str, name: &str, overload: &str) -> (String, String, String) {
+    let d = if crate::ops::is_standard_domain(domain) { "" } else { domain };
+    (d.to_string(), name.to_string(), overload.to_string())
 }
 
 /// Decode an ONNX file and build the model representation.
@@ -496,6 +532,21 @@ pub fn load(bytes: Vec<u8>, file_name: String, file_path: Option<String>) -> Res
         }
     }
 
+    let mut functions = HashMap::new();
+    for (gid, g) in b.graphs.iter().enumerate() {
+        if let GraphOwner::Function {
+            domain,
+            name,
+            overload,
+            ..
+        } = &g.owner
+        {
+            functions
+                .entry(function_key(domain, name, overload))
+                .or_insert(gid);
+        }
+    }
+
     Ok(Model {
         ir_version: mp.ir_version,
         producer_name: mp.producer_name,
@@ -506,6 +557,7 @@ pub fn load(bytes: Vec<u8>, file_name: String, file_path: Option<String>) -> Res
         opsets,
         metadata: kv(mp.metadata_props),
         graphs: b.graphs,
+        functions,
         file_name,
         file_path,
         file_size,
@@ -849,6 +901,7 @@ impl Builder {
                 name: n.name,
                 op_type: n.op_type,
                 domain: n.domain,
+                overload: n.overload,
                 inputs,
                 outputs,
                 attributes,
@@ -871,6 +924,7 @@ impl Builder {
             index,
             domain: f.domain.clone(),
             name: f.name.clone(),
+            overload: f.overload.clone(),
         };
         let mut g = proto::GraphProto {
             name: f.name.clone(),

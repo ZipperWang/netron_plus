@@ -8,6 +8,7 @@ import {
   saveText,
   select,
   showNode,
+  showOpFunction,
   showValue,
   useStore,
   useT,
@@ -126,6 +127,7 @@ export function OperatorsView() {
     setSel(`${r.domain}:${r.op}`);
     highlightNodes(opTitle(r.op, r.domain), graphId, viewNodesOfOp(r), jump);
   };
+  const selRow = sel ? rows.find((r) => `${r.domain}:${r.op}` === sel) : undefined;
 
   return (
     <div className="page page-split">
@@ -141,6 +143,11 @@ export function OperatorsView() {
           }
         >
           <span className="muted small">{t('ops.hint')}</span>
+          {selRow && (
+            <Button small icon="sigma" onClick={() => showOpFunction({ op: selRow.op, domain: selRow.domain })}>
+              {t('ops.viewFunction', { op: opTitle(selRow.op, selRow.domain) })}
+            </Button>
+          )}
         </TableToolbar>
         <VirtualTable
           rows={filtered}
