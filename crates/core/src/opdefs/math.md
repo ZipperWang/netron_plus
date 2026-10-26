@@ -262,11 +262,14 @@ zh: 沿指定轴的累加和。
 ```tex exclusive = 0, reverse = 0
 y_{i} = \sum_{k=0}^{i} x_{k}
 ```
-```tex exclusive = 1
+```tex exclusive = 1, reverse = 0
 y_{i} = \sum_{k=0}^{i-1} x_{k}
 ```
-```tex reverse = 1
+```tex exclusive = 0, reverse = 1
 y_{i} = \sum_{k=i}^{n-1} x_{k}
+```
+```tex exclusive = 1, reverse = 1
+y_{i} = \sum_{k=i+1}^{n-1} x_{k}
 ```
 sym: \text{axis} = in:axis.value
 sym: \text{exclusive} = attr:exclusive ?= 0

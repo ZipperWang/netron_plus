@@ -56,6 +56,8 @@ sym: \text{keepdims} = attr:keepdims ?= 1
 ## ReduceL1
 en: L1 norm over the given axes.
 zh: 在给定轴上求 L1 范数。
+note.en: With noop_with_empty_axes = 1 and no axes nothing is reduced, but the element-wise part still applies: Y = |X|.
+note.zh: noop_with_empty_axes = 1 且未给出 axes 时不做规约，但逐元素部分仍会计算：Y = |X|。
 ```tex
 Y = \sum_{\mathcal{A}} \lvert X \rvert
 ```
@@ -65,6 +67,8 @@ sym: \text{keepdims} = attr:keepdims ?= 1
 ## ReduceL2
 en: L2 norm over the given axes.
 zh: 在给定轴上求 L2 范数。
+note.en: With noop_with_empty_axes = 1 and no axes nothing is reduced, but the element-wise part still applies: Y = |X|.
+note.zh: noop_with_empty_axes = 1 且未给出 axes 时不做规约，但逐元素部分仍会计算：Y = |X|。
 ```tex
 Y = \sqrt{\sum_{\mathcal{A}} X^{2}}
 ```
@@ -74,6 +78,8 @@ sym: \text{keepdims} = attr:keepdims ?= 1
 ## ReduceSumSquare
 en: Sum of squares over the given axes.
 zh: 在给定轴上求平方和。
+note.en: With noop_with_empty_axes = 1 and no axes nothing is reduced, but the element-wise part still applies: Y = X².
+note.zh: noop_with_empty_axes = 1 且未给出 axes 时不做规约，但逐元素部分仍会计算：Y = X²。
 ```tex
 Y = \sum_{\mathcal{A}} X^{2}
 ```
@@ -83,6 +89,8 @@ sym: \text{keepdims} = attr:keepdims ?= 1
 ## ReduceLogSum
 en: Logarithm of the sum over the given axes.
 zh: 在给定轴上求和后取对数。
+note.en: With noop_with_empty_axes = 1 and no axes nothing is reduced, but the element-wise part still applies: Y = ln X.
+note.zh: noop_with_empty_axes = 1 且未给出 axes 时不做规约，但逐元素部分仍会计算：Y = ln X。
 ```tex
 Y = \ln \sum_{\mathcal{A}} X
 ```
@@ -92,6 +100,8 @@ sym: \text{keepdims} = attr:keepdims ?= 1
 ## ReduceLogSumExp
 en: Log-sum-exp over the given axes.
 zh: 在给定轴上计算 log-sum-exp。
+note.en: With noop_with_empty_axes = 1 and no axes nothing is reduced, but the element-wise part still applies: Y = X.
+note.zh: noop_with_empty_axes = 1 且未给出 axes 时不做规约，但逐元素部分仍会计算：Y = X。
 ```tex
 Y = \ln \sum_{\mathcal{A}} e^{X}
 ```

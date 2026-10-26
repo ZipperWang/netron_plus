@@ -539,8 +539,8 @@ fn reduction_axes_follow_noop_flag() {
         let f = call(&ws, "opFunction", json!({"model": id, "graph": 0, "node": n}));
         symbol(&f, r"\mathcal{A}")["value"].as_str().unwrap().to_string()
     };
-    // Missing axes with noop_with_empty_axes = 1: identity.
-    assert_eq!(axes(0), r"\varnothing\ (\text{identity})");
+    // Missing axes with noop_with_empty_axes = 1: nothing is reduced.
+    assert_eq!(axes(0), r"\varnothing\ (\text{no reduction})");
     // An empty axes tensor with the default flag reduces every axis.
     assert_eq!(axes(1), r"(0,\, 1)");
     // Given axes win over the flag.

@@ -674,7 +674,8 @@ impl Binder<'_> {
 
     /// The axes a Reduce* node reduces over: the axes attribute (before
     /// opset 18) or input, where empty or missing means every axis unless
-    /// noop_with_empty_axes makes the node an identity.
+    /// noop_with_empty_axes skips the reduction (the element-wise part of
+    /// e.g. ReduceSumSquare still applies, so this is not an identity).
     fn reduce_axes(&self) -> Eval {
         let n = self.node;
         if let Some(a) = n.attributes.iter().find(|a| a.name == "axes") {
@@ -696,7 +697,7 @@ impl Binder<'_> {
             return Eval::Found(tex::tuple(axes), source);
         }
         if n.attr_i("noop_with_empty_axes") == Some(1) {
-            return Eval::Found(r"\varnothing\ (\text{identity})".to_string(), "derived");
+            return Eval::Found(r"\varnothing\ (\text{no reduction})".to_string(), "derived");
         }
         let rank = n
             .input(0)
