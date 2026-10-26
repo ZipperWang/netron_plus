@@ -5,13 +5,16 @@
 ## MaxPool
 en: N-D max pooling; padded positions never win.
 zh: N 维最大池化；填充位置不参与取最大值。
-note.en: With ceil_mode = 1 the floor in the output size becomes a ceiling.
-note.zh: ceil_mode = 1 时输出尺寸公式中的向下取整改为向上取整。
+note.en: With ceil_mode = 1 the size is rounded up, but a last window that would start in the right padding is dropped.
+note.zh: ceil_mode = 1 时向上取整，但若最后一个窗口的起点落在右侧填充区内则丢弃该窗口。
 ```tex
 Y_{n,c,\mathbf{o}} = \max_{\mathbf{k}} X_{n,\, c,\; \mathbf{s} \odot \mathbf{o} + \mathbf{d} \odot \mathbf{k} - \mathbf{p}^{\mathrm{begin}}}
 ```
 ```tex shape
-O_i = \floor{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1
+O_i = \floor{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1 \qquad (\text{ceil\_mode} = 0)
+```
+```tex ceil_mode = 1
+O'_i = \ceil{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1, \qquad O_i = \begin{cases} O'_i - 1, & (O'_i - 1)\, s_i \ge I_i + p^{\mathrm{begin}}_i \\ O'_i, & \text{otherwise} \end{cases}
 ```
 sym: \mathbf{K} = attr:kernel_shape
 sym: \mathbf{s} = attr:strides ?= (1, \ldots, 1)
@@ -31,7 +34,10 @@ note.zh: count_include_pad = 0 时除以窗口内非填充元素的个数；为 
 Y_{n,c,\mathbf{o}} = \frac{1}{\lvert \mathcal{K}_{\mathbf{o}} \rvert} \sum_{\mathbf{k} \in \mathcal{K}_{\mathbf{o}}} X_{n,\, c,\; \mathbf{s} \odot \mathbf{o} + \mathbf{d} \odot \mathbf{k} - \mathbf{p}^{\mathrm{begin}}}
 ```
 ```tex shape
-O_i = \floor{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1
+O_i = \floor{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1 \qquad (\text{ceil\_mode} = 0)
+```
+```tex ceil_mode = 1
+O'_i = \ceil{\frac{I_i + p^{\mathrm{begin}}_i + p^{\mathrm{end}}_i - d_i\,(K_i - 1) - 1}{s_i}} + 1, \qquad O_i = \begin{cases} O'_i - 1, & (O'_i - 1)\, s_i \ge I_i + p^{\mathrm{begin}}_i \\ O'_i, & \text{otherwise} \end{cases}
 ```
 sym: \mathbf{K} = attr:kernel_shape
 sym: \mathbf{s} = attr:strides ?= (1, \ldots, 1)

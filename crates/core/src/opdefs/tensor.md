@@ -46,10 +46,21 @@ sym: \operatorname{shape}(X) = in:input.shape
 ## Slice
 en: Takes a strided slice along the given axes, like X[starts:ends:steps].
 zh: 沿给定轴取带步长的切片，相当于 X[starts:ends:steps]。
-note.en: Before opset 10 starts, ends and axes are attributes; ends are clamped to the dimension size.
-note.zh: opset 10 之前 starts、ends、axes 为属性；超出范围的 ends 会被截断到维度大小。
+note.en: Before opset 10 starts, ends and axes are attributes. Negative bounds count from the end and are then clamped to the dimension.
+note.zh: opset 10 之前 starts、ends、axes 为属性。负的边界从末尾计数，随后被截断到维度范围内。
 ```tex
-Y = X_{[\, b_a : e_a : t_a \,]_{a \in \text{axes}}}, \qquad \operatorname{shape}(Y)_a = \max\left(0,\, \ceil{\frac{e_a - b_a}{t_a}}\right)
+Y = X_{[\, \hat{b}_a : \hat{e}_a : t_a \,]_{a \in \text{axes}}}
+```
+```tex shape
+\operatorname{shape}(Y)_a = \max\left(0,\, \ceil{\frac{\hat{e}_a - \hat{b}_a}{t_a}}\right), \qquad d_a = \operatorname{shape}(X)_a
+```
+```tex where
+\begin{aligned}
+b' &= \begin{cases} b_a + d_a, & b_a < 0 \\ b_a, & \text{otherwise} \end{cases} &
+e' &= \begin{cases} e_a + d_a, & e_a < 0 \\ e_a, & \text{otherwise} \end{cases} \\
+\hat{b}_a &= \begin{cases} \min\left(\max(b',\, 0),\, d_a\right), & t_a > 0 \\ \min\left(\max(b',\, 0),\, d_a - 1\right), & t_a < 0 \end{cases} &
+\hat{e}_a &= \begin{cases} \min\left(\max(e',\, 0),\, d_a\right), & t_a > 0 \\ \min\left(\max(e',\, -1),\, d_a - 1\right), & t_a < 0 \end{cases}
+\end{aligned}
 ```
 sym: \mathbf{b} = in:starts.value, attr:starts
 sym: \mathbf{e} = in:ends.value, attr:ends
